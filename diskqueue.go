@@ -72,6 +72,7 @@ func (q *DiskQueue) Put(data []byte) (err error) {
 func (q *DiskQueue) seek(msgid uint64) (seg *segment, pos uint32, err error) {
 	q.RLock()
 	defer q.RUnlock()
+	log.Debug("dq seek")
 	if len(q.segs) == 0 {
 		err = ErrEmptySegments
 		return

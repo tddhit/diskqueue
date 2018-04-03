@@ -27,8 +27,10 @@ func startRead(i int) {
 		log.Fatal(err)
 	}
 	for msg := range ch {
-		log.Infof("goroutine(%d):%d-%s\n", i, msg.Id, string(msg.Data))
+		//log.Debugf("%d-%s\n", msg.Id, string(msg.Data))
+		log.Infof("gid(%d):%d-%s\n", i, msg.Id, string(msg.Data))
 	}
+	log.Debug("End!")
 }
 
 func TestDiskQueue(t *testing.T) {
@@ -39,8 +41,8 @@ func TestDiskQueue(t *testing.T) {
 		log.Fatal(err)
 	}
 	go startWrite()
-	for i := 0; i < 1; i++ {
+	for i := 0; i < 10000; i++ {
 		go startRead(i)
 	}
-	time.Sleep(10 * time.Second)
+	time.Sleep(1 * time.Hour)
 }

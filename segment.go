@@ -148,7 +148,9 @@ func (s *segment) writeLog(msg *Message) (uint32, error) {
 		s.logFile = nil
 		return 0, err
 	}
-	return atomic.AddUint32(&s.pos, 12+dataLen), nil
+	pos := atomic.LoadUint32(&s.pos)
+	atomic.AddUint32(&s.pos, 12+dataLen)
+	return pos, nil
 }
 
 func (s *segment) writeIndex(offset, pos uint32) error {
@@ -188,15 +190,18 @@ func (s *segment) seek(msgid uint64) (pos uint32, err error) {
 	if len(s.indexs) == 0 {
 		return
 	}
+	log.Debugf("seg seek:%#v\n", s.indexs[0])
 	offset := uint32(msgid - s.minMsgid)
 	index := sort.Search(len(s.indexs), func(i int) bool {
 		return s.indexs[i].offset > offset
 	})
 	if index == 0 {
+		log.Fatal(err)
 		err = ErrNotFoundIndex
 		return
 	}
 	pos = s.indexs[index-1].pos
+	log.Debug("seg seek:", index-1, s.indexs[index-1].offset, s.indexs[index-1].pos)
 	return
 }
 
@@ -218,7 +223,7 @@ func (s *segment) readOne(msgid uint64, pos uint32) (msg *Message, nextPos uint3
 			return
 		}
 		pos += 4
-		log.Debug(id, msgid, len)
+		log.Debug(id, len, msgid, pos)
 		if id < msgid {
 			pos += len
 			continue
