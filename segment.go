@@ -11,6 +11,8 @@ import (
 	"sync/atomic"
 	"syscall"
 	"unsafe"
+
+	"github.com/tddhit/tools/log"
 )
 
 const (
@@ -184,7 +186,6 @@ func (s *segment) seek(msgid uint64) (pos uint32, err error) {
 	s.RLock()
 	defer s.RUnlock()
 	if len(s.indexs) == 0 {
-		err = ErrEmptyIndexs
 		return
 	}
 	offset := uint32(msgid - s.minMsgid)
@@ -217,6 +218,7 @@ func (s *segment) readOne(msgid uint64, pos uint32) (msg *Message, nextPos uint3
 			return
 		}
 		pos += 4
+		log.Debug(id, msgid, len)
 		if id < msgid {
 			pos += len
 			continue

@@ -44,15 +44,18 @@ type DiskQueue struct {
 	notifyChans       []chan struct{}
 }
 
-func NewDiskQueue(topic string) *DiskQueue {
+func NewDiskQueue(topic string) (*DiskQueue, error) {
 	q := &DiskQueue{
 		name: topic,
 
 		writeChan:         make(chan *Message),
 		writeResponseChan: make(chan error),
 	}
+	if err := q.createSegment(0); err != nil {
+		return nil, err
+	}
 	go q.writeLoop()
-	return q
+	return q, nil
 }
 
 func (q *DiskQueue) Put(data []byte) (err error) {
@@ -63,7 +66,6 @@ func (q *DiskQueue) Put(data []byte) (err error) {
 	if err != nil {
 		return
 	}
-	atomic.AddUint64(&q.msgid, 1)
 	return
 }
 
@@ -86,16 +88,23 @@ func (q *DiskQueue) seek(msgid uint64) (seg *segment, pos uint32, err error) {
 	return
 }
 
+func (q *DiskQueue) createSegment(msgid uint64) (err error) {
+	seg, err := newSegment(q.name, msgid, os.O_CREATE|os.O_RDWR|os.O_APPEND)
+	if err != nil {
+		return
+	}
+	q.Lock()
+	q.segs = append(q.segs, seg)
+	q.Unlock()
+	q.curSeg = seg
+	return
+}
+
 func (q *DiskQueue) writeOne(msg *Message) error {
-	if q.curSeg == nil || q.curSeg.full() {
-		seg, err := newSegment(q.name, msg.Id, os.O_CREATE|os.O_RDWR|os.O_APPEND)
-		if err != nil {
+	if q.curSeg.full() {
+		if err := q.createSegment(msg.Id); err != nil {
 			return err
 		}
-		q.Lock()
-		q.segs = append(q.segs, seg)
-		q.Unlock()
-		q.curSeg = seg
 	}
 	if err := q.curSeg.writeOne(msg); err != nil {
 		return err
@@ -108,9 +117,11 @@ func (q *DiskQueue) writeLoop() {
 	for {
 		select {
 		case msg := <-q.writeChan:
+			log.Debug("!!")
 			q.writeResponseChan <- q.writeOne(msg)
 			q.RLock()
 			for _, ch := range q.notifyChans {
+				log.Debug("!!2")
 				select {
 				case ch <- struct{}{}:
 				default:
@@ -129,7 +140,7 @@ func (q *DiskQueue) StartRead(msgid uint64) (<-chan *Message, error) {
 	q.Unlock()
 	seg, pos, err := q.seek(msgid)
 	if err != nil {
-		return nil, ErrInvalidMsgid
+		return nil, err
 	}
 	go q.readLoop(seg, pos, msgid, readChan, notifyChan)
 	return readChan, nil
@@ -145,6 +156,7 @@ func (q *DiskQueue) readLoop(seg *segment, pos uint32, msgid uint64,
 
 	for {
 		curMsgid := atomic.LoadUint64(&q.msgid)
+		log.Debug(curMsgid, msgid, pos)
 		if msgid < curMsgid {
 			rchan = readChan
 			nchan = nil
@@ -153,7 +165,9 @@ func (q *DiskQueue) readLoop(seg *segment, pos uint32, msgid uint64,
 				log.Error(err)
 				os.Exit(1)
 			}
+			log.Debug("readOne:", msg.Id, string(msg.Data))
 		} else {
+			log.Debug("rchan = nil")
 			rchan = nil
 			nchan = notifyChan
 		}
