@@ -1,6 +1,21 @@
 package diskqueue
 
-import ()
+import (
+	"context"
+	"sync"
+	"sync/atomic"
+
+	"github.com/tddhit/tools/dirlock"
+	"github.com/tddhit/tools/log"
+)
+
+type contextKey struct {
+	name string
+}
+
+var (
+	DQContextKey = &contextKey{"diskqueue"}
+)
 
 type DiskQueue struct {
 	tcpServer *TCPServer
@@ -18,9 +33,9 @@ func New(opts *Options) *DiskQueue {
 	}
 	q.opts.Store(opts)
 	if err := q.dl.Lock(); err != nil {
-		log.Fatalf("%s in use", opts.DataPath)
+		log.Fatal(err)
 	}
-	log.Infof("ID: %d", opts.ID)
+	log.Infof("ID=%d\tAddress=%s\tDataPath=%s", opts.ID, opts.TCPAddress, opts.DataPath)
 	return q
 }
 
@@ -31,7 +46,8 @@ func (q *DiskQueue) getOpts() *Options {
 func (q *DiskQueue) Go() {
 	q.wg.Add(1)
 	go func() {
-		q.tcpServer.ListenAndServe()
+		ctx := context.WithValue(context.Background(), DQContextKey, q)
+		q.tcpServer.ListenAndServe(ctx)
 		q.wg.Done()
 	}()
 }
@@ -40,8 +56,15 @@ func (q *DiskQueue) GetTopic(topicName string) *Topic {
 	if t, ok := q.topicMap.Load(topicName); ok {
 		return t.(*Topic)
 	}
-	topic := NewTopic(q.getOpts().DataPath, topicName)
-	n.topicMap.Store(topicName, topic)
+	topic, _ := NewTopic(q.getOpts().DataPath, topicName)
+	q.topicMap.Store(topicName, topic)
 	log.Debugf("CreateTopic\tTopic=%s\n", topicName)
 	return topic
+}
+
+func (q *DiskQueue) Wait() {
+	q.wg.Wait()
+}
+
+func (q *DiskQueue) Exit() {
 }

@@ -40,7 +40,6 @@ type clientV2 struct {
 	metaLock  sync.RWMutex
 
 	ID     int64
-	ctx    *context
 	Reader *bufio.Reader
 	Writer *bufio.Writer
 
@@ -61,14 +60,13 @@ type clientV2 struct {
 	SubEventChan      chan *Channel
 }
 
-func newClientV2(id int64, conn net.Conn, ctx *context) *clientV2 {
+func newClientV2(id int64, conn net.Conn) *clientV2 {
 	var identifier string
 	if conn != nil {
 		identifier, _, _ = net.SplitHostPort(conn.RemoteAddr().String())
 	}
 	c := &clientV2{
 		ID:     id,
-		ctx:    ctx,
 		Conn:   conn,
 		Reader: bufio.NewReaderSize(conn, defaultBufferSize),
 		Writer: bufio.NewWriterSize(conn, defaultBufferSize),

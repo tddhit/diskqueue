@@ -25,7 +25,6 @@ func NewOptions() *Options {
 	defaultID := int64(crc32.ChecksumIEEE(h.Sum(nil)) % 1024)
 
 	return &Options{
-		ID:         defaultID,
-		TCPAddress: "0.0.0.0:4150",
+		ID: defaultID,
 	}
 }

@@ -1,6 +1,13 @@
 package diskqueue
 
-import ()
+import (
+	"context"
+	"net"
+	"runtime"
+	"strings"
+
+	"github.com/tddhit/tools/log"
+)
 
 type TCPServer struct {
 	listener net.Listener
@@ -14,7 +21,7 @@ func NewTCPServer(address string) *TCPServer {
 	return s
 }
 
-func (s *TCPServer) ListenAndServe() error {
+func (s *TCPServer) ListenAndServe(ctx context.Context) error {
 	listener, err := net.Listen("tcp", s.address)
 	if err != nil {
 		return err
@@ -33,14 +40,14 @@ func (s *TCPServer) ListenAndServe() error {
 			}
 			break
 		}
-		go s.Handle(clientConn)
+		go s.Handle(ctx, clientConn)
 	}
 	return nil
 }
 
-func (s *TCPServer) Handle(clientConn net.Conn) {
+func (s *TCPServer) Handle(ctx context.Context, clientConn net.Conn) {
 	prot := &protocol{}
-	if err := prot.IOLoop(clientConn); err != nil {
+	if err := prot.IOLoop(ctx, clientConn); err != nil {
 		log.Errorf("client(%s) - %s", clientConn.RemoteAddr(), err)
 		return
 	}

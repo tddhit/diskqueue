@@ -1,6 +1,22 @@
 package diskqueue
 
-import ()
+import (
+	"bytes"
+	"errors"
+	"fmt"
+	"io/ioutil"
+	"math/rand"
+	"os"
+	"path"
+	"sort"
+	"strconv"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
+
+	"github.com/tddhit/tools/log"
+)
 
 var (
 	ErrEmptySegments   = errors.New("empty segments")
@@ -65,8 +81,8 @@ func (t *Topic) GetChannel(channelName string) *Channel {
 	if c, ok := t.channelMap.Load(channelName); ok {
 		return c.(*Channel)
 	}
-	readChan, _ := t.backend.StartRead(0)
-	channel := NewChannel(t.name, channelName, readChan, t.ctx)
+	readChan, _ := t.StartRead(0)
+	channel := NewChannel(t.name, channelName, readChan)
 	t.channelMap.Store(channelName, channel)
 	log.Debugf("CreateChannel\tTopic=%s\tChannel=%s\n", t.name, channel.name)
 	return channel

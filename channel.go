@@ -14,18 +14,16 @@ type Channel struct {
 	name      string
 	topicName string
 	clients   sync.Map
-	readChan  <-chan *diskqueue.Message
-	ctx       *context
+	readChan  <-chan *Message
 
 	exitFlag int32
 }
 
-func NewChannel(topicName, channelName string, readChan <-chan *diskqueue.Message, ctx *context) *Channel {
+func NewChannel(topicName, channelName string, readChan <-chan *Message) *Channel {
 	c := &Channel{
 		name:      channelName,
 		topicName: topicName,
 		readChan:  readChan,
-		ctx:       ctx,
 	}
 	return c
 }
@@ -54,6 +52,6 @@ func (c *Channel) RemoveClient(clientID int64) {
 	c.clients.Delete(clientID)
 }
 
-func (c *Channel) Get() *diskqueue.Message {
+func (c *Channel) Get() *Message {
 	return <-c.readChan
 }
