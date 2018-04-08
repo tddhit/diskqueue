@@ -2,33 +2,47 @@ package client
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"net"
 	"strings"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/tddhit/tools/log"
 )
 
 type Conn struct {
-	mtx             sync.Mutex
-	conn            *net.TCPConn
-	addr            string
-	delegate        ConnDelegate
-	r               io.Reader
-	w               io.Writer
-	cmdChan         chan *Command
-	wg              sync.WaitGroup
+	mtx sync.Mutex
+
+	conn *net.TCPConn
+	addr string
+
+	delegate ConnDelegate
+
+	r io.Reader
+	w io.Writer
+
+	cmdChan    chan *Command
+	exitChan   chan struct{}
+	drainReady chan struct{}
+
+	closeFlag int32
+	stopper   sync.Once
+	wg        sync.WaitGroup
+
 	readLoopRunning int32
 }
 
 func NewConn(addr string, delegate ConnDelegate) *Conn {
 	return &Conn{
-		addr:     addr,
+		addr: addr,
+
 		delegate: delegate,
-		cmdChan:  make(chan *Command),
+
+		cmdChan:    make(chan *Command),
+		exitChan:   make(chan struct{}),
+		drainReady: make(chan struct{}),
 	}
 }
 
@@ -48,6 +62,14 @@ func (c *Conn) Connect() error {
 	return nil
 }
 
+func (c *Conn) Close() error {
+	atomic.StoreInt32(&c.closeFlag, 1)
+	if c.conn != nil {
+		return c.conn.CloseRead()
+	}
+	return nil
+}
+
 func (c *Conn) String() string {
 	return c.addr
 }
@@ -62,15 +84,18 @@ func (c *Conn) Write(p []byte) (int, error) {
 
 func (c *Conn) WriteCommand(cmd *Command) error {
 	c.mtx.Lock()
+
 	_, err := cmd.WriteTo(c)
 	if err != nil {
 		goto exit
 	}
 	err = c.Flush()
+
 exit:
 	c.mtx.Unlock()
 	if err != nil {
 		log.Errorf("IO error - %s", err)
+		c.delegate.OnIOError(c, err)
 	}
 	return err
 }
@@ -88,10 +113,18 @@ func (c *Conn) Flush() error {
 
 func (c *Conn) readLoop() {
 	for {
+		if atomic.LoadInt32(&c.closeFlag) == 1 {
+			goto exit
+		}
+
 		frameType, data, err := ReadUnpackedResponse(c)
 		if err != nil {
+			if err == io.EOF && atomic.LoadInt32(&c.closeFlag) == 1 {
+				goto exit
+			}
 			if !strings.Contains(err.Error(), "use of closed network connection") {
 				log.Errorf("IO error - %s", err)
+				c.delegate.OnIOError(c, err)
 			}
 			goto exit
 		}
@@ -99,6 +132,7 @@ func (c *Conn) readLoop() {
 			log.Debug("heartbeat received")
 			if err := c.WriteCommand(Nop()); err != nil {
 				log.Errorf("IO error - %s", err)
+				c.delegate.OnIOError(c, err)
 				goto exit
 			}
 			continue
@@ -110,8 +144,10 @@ func (c *Conn) readLoop() {
 			c.delegate.OnMessage(c, data)
 		case FrameTypeError:
 			log.Errorf("protocol error - %s", data)
+			c.delegate.OnError(c, data)
 		default:
 			log.Errorf("IO error - %s", err)
+			c.delegate.OnIOError(c, fmt.Errorf("unknown frame type %d", frameType))
 		}
 	}
 exit:
@@ -123,34 +159,45 @@ exit:
 func (c *Conn) writeLoop() {
 	for {
 		select {
+		case <-c.exitChan:
+			log.Info("breaking out of writeLoop")
+			close(c.drainReady)
+			goto exit
 		case cmd := <-c.cmdChan:
 			if err := c.WriteCommand(cmd); err != nil {
 				log.Errorf("error sending command %s - %s", cmd, err)
+				c.close()
 				continue
 			}
 		}
 	}
-
+exit:
 	c.wg.Done()
 	log.Info("writeLoop exiting")
 }
 
+func (c *Conn) close() {
+	c.stopper.Do(func() {
+		log.Info("beginning close")
+		close(c.exitChan)
+		c.conn.CloseRead()
+
+		c.wg.Add(1)
+		go c.cleanup()
+		go c.waitForCleanup()
+	})
+}
+
 func (c *Conn) cleanup() {
-	ticker := time.NewTicker(100 * time.Millisecond)
-	lastWarning := time.Now()
+	<-c.drainReady
 	for {
 		if atomic.LoadInt32(&c.readLoopRunning) == 1 {
-			if time.Now().Sub(lastWarning) > time.Second {
-				log.Warnf("draining... readLoop still running")
-				lastWarning = time.Now()
-			}
 			continue
 		}
 		goto exit
 	}
 
 exit:
-	ticker.Stop()
 	c.wg.Done()
 	log.Info("finished draining, cleanup exiting")
 }
@@ -159,4 +206,5 @@ func (c *Conn) waitForCleanup() {
 	c.wg.Wait()
 	c.conn.CloseWrite()
 	log.Info("clean close complete")
+	c.delegate.OnClose(c)
 }

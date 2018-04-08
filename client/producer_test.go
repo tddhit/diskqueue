@@ -8,7 +8,7 @@ import (
 
 func TestProducer(t *testing.T) {
 	p := NewProducer("127.0.0.1:18800")
-	err := p.Publish("topic1", []byte("hello2"))
+	err := p.Publish("topic1", []byte("hello20"))
 	if err != nil {
 		log.Fatal(err)
 	}

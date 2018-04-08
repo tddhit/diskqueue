@@ -11,25 +11,31 @@ import (
 type producerConn interface {
 	String() string
 	Connect() error
+	Close() error
 	WriteCommand(*Command) error
 }
 
 type Producer struct {
-	addr                string
-	state               int32
-	concurrentProducers int32
+	addr string
+	conn producerConn
 
-	conn            producerConn
-	transactions    []*ProducerTransaction
+	responseChan chan []byte
+	errorChan    chan []byte
+	closeChan    chan struct{}
+
 	transactionChan chan *ProducerTransaction
-	responseChan    chan []byte
+	transactions    []*ProducerTransaction
+	state           int32
 
-	errorChan chan []byte
-	closeChan chan struct{}
-	exitChan  chan struct{}
-	stopFlag  int32
-	wg        sync.WaitGroup
-	guard     sync.Mutex
+	concurrentProducers int32
+	stopFlag            int32
+	exitChan            chan struct{}
+	wg                  sync.WaitGroup
+	guard               sync.Mutex
+}
+
+func (w *Producer) String() string {
+	return w.addr
 }
 
 type ProducerTransaction struct {
@@ -49,10 +55,34 @@ func NewProducer(addr string) *Producer {
 	p := &Producer{
 		addr:            addr,
 		transactionChan: make(chan *ProducerTransaction),
+		exitChan:        make(chan struct{}),
 		responseChan:    make(chan []byte),
 		errorChan:       make(chan []byte),
 	}
 	return p
+}
+
+func (w *Producer) Stop() {
+	w.guard.Lock()
+	if !atomic.CompareAndSwapInt32(&w.stopFlag, 0, 1) {
+		w.guard.Unlock()
+		return
+	}
+	close(w.exitChan)
+	w.close()
+	w.guard.Unlock()
+	w.wg.Wait()
+}
+
+func (w *Producer) close() {
+	if !atomic.CompareAndSwapInt32(&w.state, StateConnected, StateDisconnected) {
+		return
+	}
+	w.conn.Close()
+	go func() {
+		w.wg.Wait()
+		atomic.StoreInt32(&w.state, StateInit)
+	}()
 }
 
 func (w *Producer) Publish(topic string, body []byte) error {
@@ -109,6 +139,7 @@ func (w *Producer) connect() error {
 	log.Infof("(%s) connecting to nsqd", w.addr)
 	w.conn = NewConn(w.addr, &producerConnDelegate{w})
 	if err := w.conn.Connect(); err != nil {
+		w.conn.Close()
 		log.Errorf("(%s) error connecting to nsqd - %s", w.addr, err)
 		return err
 	}
@@ -126,6 +157,7 @@ func (w *Producer) router() {
 			w.transactions = append(w.transactions, t)
 			if err := w.conn.WriteCommand(t.cmd); err != nil {
 				log.Errorf("(%s) sending command - %s", w.conn.String(), err)
+				w.close()
 			}
 		case data := <-w.responseChan:
 			w.popTransaction(FrameTypeResponse, data)
@@ -174,8 +206,7 @@ func (w *Producer) transactionCleanup() {
 
 func (w *Producer) onConnResponse(c *Conn, data []byte) { w.responseChan <- data }
 func (w *Producer) onConnError(c *Conn, data []byte)    { w.errorChan <- data }
-func (w *Producer) onConnHeartbeat(c *Conn)             {}
-func (w *Producer) onConnIOError(c *Conn, err error)    {}
+func (w *Producer) onConnIOError(c *Conn, err error)    { w.close() }
 func (w *Producer) onConnClose(c *Conn) {
 	w.guard.Lock()
 	defer w.guard.Unlock()
