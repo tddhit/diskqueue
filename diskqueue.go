@@ -9,21 +9,14 @@ import (
 	"github.com/tddhit/tools/log"
 )
 
-type contextKey struct {
-	name string
-}
-
-var (
-	DQContextKey = &contextKey{"diskqueue"}
-)
-
 type DiskQueue struct {
 	tcpServer *TCPServer
 	topicMap  sync.Map
 
-	opts atomic.Value
-	dl   *dirlock.DirLock
-	wg   sync.WaitGroup
+	opts     atomic.Value
+	clientID int64
+	dl       *dirlock.DirLock
+	wg       sync.WaitGroup
 }
 
 func New(opts *Options) *DiskQueue {
@@ -46,7 +39,7 @@ func (q *DiskQueue) getOpts() *Options {
 func (q *DiskQueue) Go() {
 	q.wg.Add(1)
 	go func() {
-		ctx := context.WithValue(context.Background(), DQContextKey, q)
+		ctx := context.WithValue(context.Background(), "diskqueue", q)
 		q.tcpServer.ListenAndServe(ctx)
 		q.wg.Done()
 	}()

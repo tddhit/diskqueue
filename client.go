@@ -12,25 +12,11 @@ const defaultBufferSize = 16 * 1024
 
 const (
 	stateInit = iota
-	stateDisconnected
-	stateConnected
 	stateSubscribed
 	stateClosing
 )
 
-type identifyDataV2 struct {
-	ClientID          string `json:"client_id"`
-	Hostname          string `json:"hostname"`
-	HeartbeatInterval int    `json:"heartbeat_interval"`
-	MsgTimeout        int    `json:"msg_timeout"`
-}
-
-type identifyEvent struct {
-	HeartbeatInterval time.Duration
-	MsgTimeout        time.Duration
-}
-
-type clientV2 struct {
+type client struct {
 	net.Conn
 
 	MessageCount uint64
@@ -54,43 +40,42 @@ type clientV2 struct {
 	lenBuf   [4]byte
 	lenSlice []byte
 
-	ReadyStateChan    chan int
-	ExitChan          chan int
-	IdentifyEventChan chan identifyEvent
-	SubEventChan      chan *Channel
+	ExitChan     chan int
+	SubEventChan chan *Channel
 }
 
-func newClientV2(id int64, conn net.Conn) *clientV2 {
+func newClient(id int64, conn net.Conn) *client {
 	var identifier string
 	if conn != nil {
 		identifier, _, _ = net.SplitHostPort(conn.RemoteAddr().String())
 	}
-	c := &clientV2{
+	c := &client{
 		ID:     id,
 		Conn:   conn,
 		Reader: bufio.NewReaderSize(conn, defaultBufferSize),
 		Writer: bufio.NewWriterSize(conn, defaultBufferSize),
 
-		ExitChan:     make(chan int),
-		ConnectTime:  time.Now(),
-		State:        stateInit,
-		ClientID:     identifier,
-		Hostname:     identifier,
-		SubEventChan: make(chan *Channel, 1),
+		HeartbeatInterval: 18000 * time.Millisecond,
+		ExitChan:          make(chan int),
+		ConnectTime:       time.Now(),
+		State:             stateInit,
+		ClientID:          identifier,
+		Hostname:          identifier,
+		SubEventChan:      make(chan *Channel, 1),
 	}
 	c.lenSlice = c.lenBuf[:]
 	return c
 }
 
-func (c *clientV2) String() string {
+func (c *client) String() string {
 	return c.RemoteAddr().String()
 }
 
-func (c *clientV2) StartClose() {
+func (c *client) StartClose() {
 	atomic.StoreInt32(&c.State, stateClosing)
 }
 
-func (c *clientV2) Flush() error {
+func (c *client) Flush() error {
 	var zeroTime time.Time
 	if c.HeartbeatInterval > 0 {
 		c.SetWriteDeadline(time.Now().Add(c.HeartbeatInterval))

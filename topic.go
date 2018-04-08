@@ -77,18 +77,19 @@ func NewTopic(dataPath, topic string) (*Topic, error) {
 	return t, nil
 }
 
-func (t *Topic) GetChannel(channelName string) *Channel {
+func (t *Topic) GetChannel(channelName, msgid string) *Channel {
 	if c, ok := t.channelMap.Load(channelName); ok {
 		return c.(*Channel)
 	}
-	readChan, _ := t.StartRead(0)
+	id, _ := strconv.ParseUint(msgid, 10, 64)
+	readChan, _ := t.StartRead(id)
 	channel := NewChannel(t.name, channelName, readChan)
 	t.channelMap.Store(channelName, channel)
 	log.Debugf("CreateChannel\tTopic=%s\tChannel=%s\n", t.name, channel.name)
 	return channel
 }
 
-func (t *Topic) Put(data []byte) (err error) {
+func (t *Topic) PutMessage(data []byte) (err error) {
 	t.RLock()
 	defer t.RUnlock()
 
@@ -149,7 +150,7 @@ func (t *Topic) writeLoop() {
 	for {
 		select {
 		case msg := <-t.writeChan:
-			log.Debug("writeOne:", msg.Id)
+			log.Debugf("writeOne\tMsgid=%d", msg.Id)
 			t.writeResponseChan <- t.writeOne(msg)
 		case <-t.exitChan:
 			goto exit
@@ -201,6 +202,7 @@ func (t *Topic) readLoop(seg *segment, pos uint32, msgid uint64,
 		case <-t.exitChan:
 			close(readChan)
 			goto exit
+		default:
 		}
 		log.Debugf("readLoop\tcurMsgid=%d\tmsgid=%d\tpos=%d\n", curMsgid, msgid, pos)
 		time.Sleep(100 * time.Millisecond)

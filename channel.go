@@ -6,6 +6,10 @@ import (
 	"sync/atomic"
 )
 
+var (
+	ErrAlreadyExit = errors.New("already exit")
+)
+
 type Consumer interface {
 	Close() error
 }
@@ -34,13 +38,14 @@ func (c *Channel) Close() error {
 
 func (c *Channel) exit() error {
 	if !atomic.CompareAndSwapInt32(&c.exitFlag, 0, 1) {
-		return errors.New("exiting")
+		return ErrAlreadyExit
 	}
 
 	c.clients.Range(func(key, value interface{}) bool {
 		value.(Consumer).Close()
 		return true
 	})
+
 	return nil
 }
 
@@ -52,6 +57,6 @@ func (c *Channel) RemoveClient(clientID int64) {
 	c.clients.Delete(clientID)
 }
 
-func (c *Channel) Get() *Message {
+func (c *Channel) GetMessage() *Message {
 	return <-c.readChan
 }
