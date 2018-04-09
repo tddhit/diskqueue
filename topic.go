@@ -81,10 +81,18 @@ func (t *Topic) GetChannel(channelName, msgid string) *Channel {
 	if c, ok := t.channelMap.Load(channelName); ok {
 		return c.(*Channel)
 	}
+
+	t.Lock()
+	if c, ok := t.channelMap.Load(channelName); ok {
+		t.Unlock()
+		return c.(*Channel)
+	}
 	id, _ := strconv.ParseUint(msgid, 10, 64)
 	readChan, _ := t.StartRead(id)
 	channel := NewChannel(t.name, channelName, readChan)
 	t.channelMap.Store(channelName, channel)
+	t.Unlock()
+
 	log.Debugf("CreateChannel\tTopic=%s\tChannel=%s\n", t.name, channel.name)
 	return channel
 }
@@ -97,8 +105,7 @@ func (t *Topic) PutMessage(data []byte) (err error) {
 		return ErrAlreadyClose
 	}
 
-	msgid := atomic.LoadUint64(&t.msgid)
-	msg := &Message{msgid, data}
+	msg := &Message{Data: data}
 	t.writeChan <- msg
 	return <-t.writeResponseChan
 }
@@ -150,6 +157,7 @@ func (t *Topic) writeLoop() {
 	for {
 		select {
 		case msg := <-t.writeChan:
+			msg.Id = atomic.LoadUint64(&t.msgid)
 			log.Debugf("writeOne\tMsgid=%d", msg.Id)
 			t.writeResponseChan <- t.writeOne(msg)
 		case <-t.exitChan:
@@ -202,7 +210,6 @@ func (t *Topic) readLoop(seg *segment, pos uint32, msgid uint64,
 		case <-t.exitChan:
 			close(readChan)
 			goto exit
-		default:
 		}
 		log.Debugf("readLoop\tcurMsgid=%d\tmsgid=%d\tpos=%d\n", curMsgid, msgid, pos)
 		time.Sleep(100 * time.Millisecond)
@@ -321,6 +328,12 @@ func (t *Topic) exit() error {
 	for _, seg := range t.segs {
 		seg.exit()
 	}
+
+	t.channelMap.Range(func(key, value interface{}) bool {
+		channel := value.(*Channel)
+		channel.Close()
+		return true
+	})
 	return nil
 }
 

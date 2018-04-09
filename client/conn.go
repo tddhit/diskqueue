@@ -23,9 +23,8 @@ type Conn struct {
 	r io.Reader
 	w io.Writer
 
-	cmdChan    chan *Command
-	exitChan   chan struct{}
-	drainReady chan struct{}
+	cmdChan  chan *Command
+	exitChan chan struct{}
 
 	closeFlag int32
 	stopper   sync.Once
@@ -40,9 +39,8 @@ func NewConn(addr string, delegate ConnDelegate) *Conn {
 
 		delegate: delegate,
 
-		cmdChan:    make(chan *Command),
-		exitChan:   make(chan struct{}),
-		drainReady: make(chan struct{}),
+		cmdChan:  make(chan *Command),
+		exitChan: make(chan struct{}),
 	}
 }
 
@@ -161,7 +159,6 @@ func (c *Conn) writeLoop() {
 		select {
 		case <-c.exitChan:
 			log.Info("breaking out of writeLoop")
-			close(c.drainReady)
 			goto exit
 		case cmd := <-c.cmdChan:
 			if err := c.WriteCommand(cmd); err != nil {
@@ -189,7 +186,6 @@ func (c *Conn) close() {
 }
 
 func (c *Conn) cleanup() {
-	<-c.drainReady
 	for {
 		if atomic.LoadInt32(&c.readLoopRunning) == 1 {
 			continue

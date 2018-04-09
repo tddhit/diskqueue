@@ -12,6 +12,8 @@ func TestConsumer(t *testing.T) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	msg := c.Pull()
-	log.Debug(string(msg))
+	for {
+		msg := c.Pull()
+		log.Debug(string(msg))
+	}
 }

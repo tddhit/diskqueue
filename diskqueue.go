@@ -2,14 +2,19 @@ package diskqueue
 
 import (
 	"context"
+	"os"
+	"os/signal"
 	"sync"
 	"sync/atomic"
+	"syscall"
 
 	"github.com/tddhit/tools/dirlock"
 	"github.com/tddhit/tools/log"
 )
 
 type DiskQueue struct {
+	sync.Mutex
+
 	tcpServer *TCPServer
 	topicMap  sync.Map
 
@@ -43,14 +48,35 @@ func (q *DiskQueue) Go() {
 		q.tcpServer.ListenAndServe(ctx)
 		q.wg.Done()
 	}()
+	go func() {
+		c := make(chan os.Signal)
+		signal.Notify(c)
+		for {
+			sig := <-c
+			switch sig {
+			case syscall.SIGTERM:
+				q.Exit()
+			case syscall.SIGQUIT:
+				q.Exit()
+			}
+		}
+	}()
 }
 
 func (q *DiskQueue) GetTopic(topicName string) *Topic {
 	if t, ok := q.topicMap.Load(topicName); ok {
 		return t.(*Topic)
 	}
+
+	q.Lock()
+	if t, ok := q.topicMap.Load(topicName); ok {
+		q.Unlock()
+		return t.(*Topic)
+	}
 	topic, _ := NewTopic(q.getOpts().DataPath, topicName)
 	q.topicMap.Store(topicName, topic)
+	q.Unlock()
+
 	log.Debugf("CreateTopic\tTopic=%s\n", topicName)
 	return topic
 }
@@ -60,4 +86,9 @@ func (q *DiskQueue) Wait() {
 }
 
 func (q *DiskQueue) Exit() {
+	q.topicMap.Range(func(key, value interface{}) bool {
+		topic := value.(*Topic)
+		topic.Close()
+		return true
+	})
 }
