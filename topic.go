@@ -47,7 +47,7 @@ type Topic struct {
 	writeResponseChan chan error
 
 	needSync   bool
-	exitFlag   bool
+	exitFlag   int32
 	exitChan   chan struct{}
 	exitSyncWg sync.WaitGroup
 }
@@ -101,7 +101,7 @@ func (t *Topic) PutMessage(data []byte) (err error) {
 	t.RLock()
 	defer t.RUnlock()
 
-	if t.exitFlag {
+	if atomic.LoadInt32(&t.exitFlag) == 1 {
 		return ErrAlreadyClose
 	}
 
@@ -111,8 +111,6 @@ func (t *Topic) PutMessage(data []byte) (err error) {
 }
 
 func (t *Topic) seek(msgid uint64) (seg *segment, pos uint32, err error) {
-	t.RLock()
-	defer t.RUnlock()
 	if len(t.segs) == 0 {
 		err = ErrEmptySegments
 		return
@@ -183,7 +181,6 @@ func (t *Topic) StartRead(msgid uint64) (<-chan *Message, error) {
 func (t *Topic) readLoop(seg *segment, pos uint32, msgid uint64,
 	readChan chan<- *Message) {
 
-	var rchan chan<- *Message
 	var msg *Message
 	var err error
 
@@ -191,7 +188,6 @@ func (t *Topic) readLoop(seg *segment, pos uint32, msgid uint64,
 		curMsgid := atomic.LoadUint64(&t.msgid)
 		log.Debugf("readLoop\tcurMsgid=%d\tmsgid=%d\tpos=%d\n", curMsgid, msgid, pos)
 		if msgid < curMsgid {
-			rchan = readChan
 			msg, pos, err = seg.readOne(msgid, pos)
 			if err != nil {
 				log.Debug(err)
@@ -200,19 +196,16 @@ func (t *Topic) readLoop(seg *segment, pos uint32, msgid uint64,
 			log.Debug("readOne:", msg.Id, string(msg.Data))
 		} else {
 			log.Debug("rchan = nil")
-			rchan = nil
-		}
-		log.Debugf("readLoop\tcurMsgid=%d\tmsgid=%d\tpos=%d\n", curMsgid, msgid, pos)
-		select {
-		case rchan <- msg:
-			msgid++
+			if atomic.LoadInt32(&t.exitFlag) == 1 {
+				close(readChan)
+				goto exit
+			}
+			time.Sleep(100 * time.Millisecond)
 			continue
-		case <-t.exitChan:
-			close(readChan)
-			goto exit
 		}
+		readChan <- msg
+		msgid++
 		log.Debugf("readLoop\tcurMsgid=%d\tmsgid=%d\tpos=%d\n", curMsgid, msgid, pos)
-		time.Sleep(100 * time.Millisecond)
 	}
 exit:
 	log.Infof("diskqueue(%s) exit readLoop.", t.name)
@@ -320,7 +313,9 @@ func (t *Topic) exit() error {
 	t.Lock()
 	defer t.Unlock()
 
-	t.exitFlag = true
+	if !atomic.CompareAndSwapInt32(&t.exitFlag, 0, 1) {
+		return ErrAlreadyExit
+	}
 
 	close(t.exitChan)
 	t.exitSyncWg.Wait()

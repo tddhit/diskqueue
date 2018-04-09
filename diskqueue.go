@@ -54,8 +54,6 @@ func (q *DiskQueue) Go() {
 		for {
 			sig := <-c
 			switch sig {
-			case syscall.SIGTERM:
-				q.Exit()
 			case syscall.SIGQUIT:
 				q.Exit()
 			}

@@ -195,6 +195,7 @@ func (p *protocol) PULL(ctx context.Context, client *client, params [][]byte) (i
 	channelName := string(params[2])
 	topic := ctx.Value("diskqueue").(*DiskQueue).GetTopic(topicName)
 	channel := topic.GetChannel(channelName, "")
+	log.Debug("getchannel:", channel)
 	msg := channel.GetMessage()
 	log.Debugf("PULL\tMsg=%s", string(msg.Data))
 	return frameTypeMessage, msg.Data, nil
