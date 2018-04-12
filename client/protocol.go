@@ -4,8 +4,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
-
-	"github.com/tddhit/tools/log"
 )
 
 const (
@@ -28,10 +26,8 @@ func ReadResponse(r io.Reader) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Debug(msgSize)
 	buf := make([]byte, msgSize)
 	_, err = io.ReadFull(r, buf)
-	log.Debug(buf)
 	if err != nil {
 		return nil, err
 	}

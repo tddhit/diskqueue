@@ -15,6 +15,8 @@ type Consumer interface {
 }
 
 type Channel struct {
+	sync.RWMutex
+
 	name      string
 	topicName string
 	clients   sync.Map
@@ -58,5 +60,8 @@ func (c *Channel) RemoveClient(clientID int64) {
 }
 
 func (c *Channel) GetMessage() *Message {
+	//c.RLock()
+	//defer c.RUnlock()
+
 	return <-c.readChan
 }

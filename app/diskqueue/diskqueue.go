@@ -3,7 +3,11 @@ package main
 import (
 	"flag"
 
+	"net/http"
+	_ "net/http/pprof"
+
 	"github.com/tddhit/diskqueue"
+	"github.com/tddhit/tools/log"
 )
 
 var (
@@ -17,11 +21,13 @@ func init() {
 }
 
 func main() {
+	log.Init("diskqueue.log", log.INFO)
 	opts := diskqueue.NewOptions()
 	opts.TCPAddress = address
 	opts.DataPath = dataPath
 	dq := diskqueue.New(opts)
+	go func() {
+		log.Debug(http.ListenAndServe("localhost:6060", nil))
+	}()
 	dq.Go()
-	dq.Wait()
-	dq.Exit()
 }

@@ -4,7 +4,6 @@ import (
 	"strconv"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/tddhit/tools/log"
 )
@@ -20,10 +19,11 @@ func produce(i int) {
 		}
 	}
 	p.Stop()
-	log.Debug(j)
+	log.Info(j)
 }
 
 func TestProducer(t *testing.T) {
+	log.Init("producer.log", log.DEBUG)
 	var wg sync.WaitGroup
 	for i := 0; i < 10; i++ {
 		wg.Add(1)
@@ -33,5 +33,4 @@ func TestProducer(t *testing.T) {
 		}(i)
 	}
 	wg.Wait()
-	time.Sleep(10 * time.Second)
 }

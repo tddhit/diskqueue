@@ -105,7 +105,6 @@ func (r *Consumer) Pull() []byte {
 		log.Error(err)
 		return nil
 	}
-	log.Debug("pull")
 	return <-r.incomingMessages
 }
 

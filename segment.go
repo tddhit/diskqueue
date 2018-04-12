@@ -148,7 +148,7 @@ func (s *segment) writeLog(msg *Message) error {
 	//s.writeBuf.WriteString(",")
 	//s.writeBuf.Write(msg.Data)
 	//s.writeBuf.WriteString("\n")
-	log.Debug(msg.Id, string(msg.Data))
+	//log.Debug(msg.Id, string(msg.Data))
 	if _, err := s.logFile.Write(s.writeBuf.Bytes()); err != nil {
 		s.logFile.Close()
 		s.logFile = nil

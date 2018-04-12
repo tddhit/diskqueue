@@ -147,6 +147,7 @@ func (t *Topic) writeOne(msg *Message) error {
 	if err := t.curSeg.writeOne(msg); err != nil {
 		return err
 	}
+	log.Debugf("writeOne\tid=%d\tdata=%s", msg.Id, string(msg.Data))
 	atomic.AddUint64(&t.msgid, 1)
 	return nil
 }
@@ -156,9 +157,9 @@ func (t *Topic) writeLoop() {
 		select {
 		case msg := <-t.writeChan:
 			msg.Id = atomic.LoadUint64(&t.msgid)
-			log.Debugf("writeOne\tMsgid=%d", msg.Id)
 			t.writeResponseChan <- t.writeOne(msg)
 		case <-t.exitChan:
+			log.Info("receive exitChan")
 			goto exit
 		}
 	}
@@ -185,29 +186,30 @@ func (t *Topic) readLoop(seg *segment, pos uint32, msgid uint64,
 	var err error
 
 	for {
+		log.Info("exitFlag", t.exitFlag)
+		if atomic.LoadInt32(&t.exitFlag) == 1 {
+			goto exit
+		}
 		curMsgid := atomic.LoadUint64(&t.msgid)
-		log.Debugf("readLoop\tcurMsgid=%d\tmsgid=%d\tpos=%d\n", curMsgid, msgid, pos)
 		if msgid < curMsgid {
 			msg, pos, err = seg.readOne(msgid, pos)
 			if err != nil {
-				log.Debug(err)
-				os.Exit(1)
+				log.Fatal(err)
 			}
-			log.Debug("readOne:", msg.Id, string(msg.Data))
 		} else {
-			log.Debug("rchan = nil")
-			if atomic.LoadInt32(&t.exitFlag) == 1 {
-				close(readChan)
-				goto exit
-			}
 			time.Sleep(100 * time.Millisecond)
 			continue
 		}
-		readChan <- msg
-		msgid++
-		log.Debugf("readLoop\tcurMsgid=%d\tmsgid=%d\tpos=%d\n", curMsgid, msgid, pos)
+		select {
+		case readChan <- msg:
+			msgid++
+		case <-t.exitChan:
+			log.Info("receive exitChan")
+			goto exit
+		}
 	}
 exit:
+	close(readChan)
 	log.Infof("diskqueue(%s) exit readLoop.", t.name)
 	t.exitSyncWg.Done()
 }
@@ -258,7 +260,6 @@ func (t *Topic) loadMetaData() error {
 			t.msgid = msgid
 		} else {
 			tokens := strings.Split(lines[i], ",")
-			log.Debug(tokens)
 			if len(tokens) != 4 {
 				return ErrMetaData
 			}
@@ -302,6 +303,7 @@ func (t *Topic) loadMetaData() error {
 }
 
 func (t *Topic) Close() error {
+	log.Info("Topic Close")
 	err := t.exit()
 	if err != nil {
 		return err
@@ -310,14 +312,18 @@ func (t *Topic) Close() error {
 }
 
 func (t *Topic) exit() error {
+	log.Info("Topic Close1")
 	t.Lock()
 	defer t.Unlock()
+	log.Info("Topic Close2")
 
 	if !atomic.CompareAndSwapInt32(&t.exitFlag, 0, 1) {
 		return ErrAlreadyExit
 	}
 
+	log.Info("Topic Close3")
 	close(t.exitChan)
+	log.Info("Close exitChan")
 	t.exitSyncWg.Wait()
 
 	for _, seg := range t.segs {

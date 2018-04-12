@@ -6,7 +6,6 @@ import (
 	"os/signal"
 	"sync"
 	"sync/atomic"
-	"syscall"
 
 	"github.com/tddhit/tools/dirlock"
 	"github.com/tddhit/tools/log"
@@ -48,17 +47,10 @@ func (q *DiskQueue) Go() {
 		q.tcpServer.ListenAndServe(ctx)
 		q.wg.Done()
 	}()
-	go func() {
-		c := make(chan os.Signal)
-		signal.Notify(c)
-		for {
-			sig := <-c
-			switch sig {
-			case syscall.SIGQUIT:
-				q.Exit()
-			}
-		}
-	}()
+	signalChan := make(chan os.Signal)
+	signal.Notify(signalChan)
+	<-signalChan
+	q.Exit()
 }
 
 func (q *DiskQueue) GetTopic(topicName string) *Topic {
@@ -79,11 +71,11 @@ func (q *DiskQueue) GetTopic(topicName string) *Topic {
 	return topic
 }
 
-func (q *DiskQueue) Wait() {
-	q.wg.Wait()
-}
-
 func (q *DiskQueue) Exit() {
+	q.tcpServer.Close()
+	log.Error("Wait")
+	q.tcpServer.wg.Wait()
+	log.Error("Exit")
 	q.topicMap.Range(func(key, value interface{}) bool {
 		topic := value.(*Topic)
 		topic.Close()

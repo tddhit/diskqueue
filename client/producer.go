@@ -159,6 +159,7 @@ func (w *Producer) router() {
 				log.Errorf("(%s) sending command - %s", w.conn.String(), err)
 				w.close()
 			}
+			log.Debug("WriteCommand", string(t.cmd.Body))
 		case data := <-w.responseChan:
 			w.popTransaction(FrameTypeResponse, data)
 		case data := <-w.errorChan:

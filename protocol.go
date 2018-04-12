@@ -32,6 +32,12 @@ var (
 	ErrInvalidState  = errors.New("invalid state")
 )
 
+type Command struct {
+	Name   []byte
+	Params [][]byte
+	Body   []byte
+}
+
 type protocol struct {
 }
 
@@ -43,7 +49,8 @@ func (p *protocol) IOLoop(ctx context.Context, conn net.Conn) error {
 	client := newClient(clientID, conn)
 
 	messagePumpStartedChan := make(chan bool)
-	go p.messagePump(client, messagePumpStartedChan)
+	cmdChan := make(chan struct{})
+	go p.messagePump(ctx, client, messagePumpStartedChan, cmdChan)
 	<-messagePumpStartedChan
 
 	for {
@@ -62,22 +69,29 @@ func (p *protocol) IOLoop(ctx context.Context, conn net.Conn) error {
 		}
 		line = line[:len(line)-1]
 		params := bytes.Split(line, separatorBytes)
-		log.Debugf("Command\tClient=%s\tParams=%s\n", client, params)
-		frameType, response, err := p.Exec(ctx, client, params)
-		if err != nil {
-			sendErr := p.Send(client, frameTypeError, []byte(err.Error()))
-			if sendErr != nil {
-				log.Errorf("[%s] - %s%s", client, sendErr)
-				break
-			}
-			continue
-		}
-		log.Debugf("Response\tType=%d\tClient=%s\tBody=%s\n", frameType, client, string(response))
-		if response != nil {
-			err = p.Send(client, frameType, response)
+		log.Infof("Command\tClient=%s\tParams=%s\n", client, params)
+		if bytes.Equal(params[0], []byte("PULL")) {
+			cmdChan <- struct{}{}
+		} else {
+			frameType, response, err := p.Exec(ctx, client, params)
 			if err != nil {
-				err = fmt.Errorf("failed to send response - %s", err)
-				break
+				if err == ErrAlreadyClose {
+					break
+				}
+				sendErr := p.Send(client, frameTypeError, []byte(err.Error()))
+				if sendErr != nil {
+					log.Errorf("[%s] - %s%s", client, sendErr)
+					break
+				}
+				continue
+			}
+			log.Debugf("Response\tType=%d\tClient=%s\tBody=%s\n", frameType, client, string(response))
+			if response != nil {
+				err = p.Send(client, frameType, response)
+				if err != nil {
+					err = fmt.Errorf("failed to send response - %s", err)
+					break
+				}
 			}
 		}
 	}
@@ -108,14 +122,35 @@ func (p *protocol) Send(client *client, frameType int32, data []byte) error {
 	return err
 }
 
-func (p *protocol) Exec(ctx context.Context, client *client, params [][]byte) (int32, []byte, error) {
+func (p *protocol) parsePUB(client *client, params [][]byte) (*Command, error) {
+	var err error
+
+	if len(params) < 2 {
+		log.Error("InvalidParams")
+		return nil, ErrInvalidParams
+	}
+	bodyLen, err := readLen(client.Reader, client.lenSlice)
+	if err != nil || bodyLen <= 0 {
+		return nil, ErrBadMessage
+	}
+	messageBody := make([]byte, bodyLen)
+	if _, err = io.ReadFull(client.Reader, messageBody); err != nil {
+		return nil, ErrBadMessage
+	}
+	log.Info("parsePUB", string(params[0]))
+	return &Command{params[0], params, messageBody}, nil
+}
+
+func (p *protocol) Exec(
+	ctx context.Context,
+	client *client,
+	params [][]byte) (int32, []byte, error) {
+
 	switch {
 	case bytes.Equal(params[0], []byte("PUB")):
 		return p.PUB(ctx, client, params)
 	case bytes.Equal(params[0], []byte("SUB")):
 		return p.SUB(ctx, client, params)
-	case bytes.Equal(params[0], []byte("PULL")):
-		return p.PULL(ctx, client, params)
 	case bytes.Equal(params[0], []byte("NOP")):
 		return p.NOP(ctx, client, params)
 	case bytes.Equal(params[0], []byte("CLS")):
@@ -124,9 +159,13 @@ func (p *protocol) Exec(ctx context.Context, client *client, params [][]byte) (i
 	return frameTypeError, nil, ErrInvalidParams
 }
 
-func (p *protocol) messagePump(client *client, startedChan chan bool) {
-	var err error
+func (p *protocol) messagePump(
+	ctx context.Context,
+	client *client,
+	startedChan chan bool,
+	cmdChan chan struct{}) {
 
+	var err error
 	heartbeatTicker := time.NewTicker(client.HeartbeatInterval)
 	heartbeatChan := heartbeatTicker.C
 
@@ -137,6 +176,36 @@ func (p *protocol) messagePump(client *client, startedChan chan bool) {
 			err = p.Send(client, frameTypeResponse, heartbeatBytes)
 			if err != nil {
 				goto exit
+			}
+		case <-cmdChan:
+			var err error
+			var response []byte
+			var frameType int32
+
+			if atomic.LoadInt32(&client.State) != stateSubscribed {
+				frameType, response, err = frameTypeError, nil, ErrInvalidState
+			} else {
+				msg := client.Channel.GetMessage()
+				if msg == nil {
+					frameType, response, err = frameTypeError, nil, ErrAlreadyClose
+				} else {
+					frameType, response = frameTypeMessage, msg.Data
+				}
+			}
+			if err != nil {
+				sendErr := p.Send(client, frameTypeError, []byte(err.Error()))
+				if sendErr != nil {
+					log.Errorf("[%s] - %s%s", client, sendErr)
+					goto exit
+				}
+				continue
+			}
+			if response != nil {
+				err = p.Send(client, frameType, response)
+				if err != nil {
+					err = fmt.Errorf("failed to send response - %s", err)
+					goto exit
+				}
 			}
 		case <-client.ExitChan:
 			goto exit
@@ -184,27 +253,11 @@ func (p *protocol) NOP(ctx context.Context, client *client, params [][]byte) (in
 	return frameTypeResponse, nil, nil
 }
 
-func (p *protocol) PULL(ctx context.Context, client *client, params [][]byte) (int32, []byte, error) {
-	if atomic.LoadInt32(&client.State) != stateSubscribed {
-		return frameTypeError, nil, ErrInvalidState
-	}
-	if len(params) < 3 {
-		return frameTypeError, nil, ErrInvalidParams
-	}
-	topicName := string(params[1])
-	channelName := string(params[2])
-	topic := ctx.Value("diskqueue").(*DiskQueue).GetTopic(topicName)
-	channel := topic.GetChannel(channelName, "")
-	log.Debug("getchannel:", channel)
-	msg := channel.GetMessage()
-	log.Debugf("PULL\tMsg=%s", string(msg.Data))
-	return frameTypeMessage, msg.Data, nil
-}
-
 func (p *protocol) PUB(ctx context.Context, client *client, params [][]byte) (int32, []byte, error) {
 	var err error
 
 	if len(params) < 2 {
+		log.Error("InvalidParams")
 		return frameTypeError, nil, ErrInvalidParams
 	}
 	topicName := string(params[1])
@@ -241,10 +294,7 @@ func SendFramedResponse(w io.Writer, frameType int32, data []byte) (int, error) 
 		return n, err
 	}
 
-	log.Debug(beBuf)
 	binary.BigEndian.PutUint32(beBuf, uint32(frameType))
-	log.Debug(beBuf)
-	log.Debug(data)
 	n, err = w.Write(beBuf)
 	if err != nil {
 		return n + 4, err
@@ -252,4 +302,7 @@ func SendFramedResponse(w io.Writer, frameType int32, data []byte) (int, error) 
 
 	n, err = w.Write(data)
 	return n + 8, err
+}
+
+func (p *protocol) Close() {
 }
