@@ -8,23 +8,24 @@ import (
 	"sync/atomic"
 	"time"
 
+	etcd "github.com/coreos/etcd/clientv3"
 	"github.com/tddhit/tools/log"
+	"github.com/tddhit/wox/naming"
 )
 
 type Consumer struct {
 	mtx sync.RWMutex
 
-	topic   string
-	channel string
-	conn    *Conn
-
+	topic            string
+	channel          string
+	conns            []*Conn
 	incomingMessages chan []byte
 
-	wg            sync.WaitGroup
-	stopFlag      int32
-	connectedFlag int32
-	stopHandler   sync.Once
-	exitHandler   sync.Once
+	wg          sync.WaitGroup
+	counter     uint64
+	stopFlag    int32
+	stopHandler sync.Once
+	exitHandler sync.Once
 
 	StopChan chan struct{}
 	exitChan chan struct{}
@@ -32,9 +33,8 @@ type Consumer struct {
 
 func NewConsumer(topic string, channel string) *Consumer {
 	r := &Consumer{
-		topic:   topic,
-		channel: channel,
-
+		topic:            topic,
+		channel:          channel,
 		incomingMessages: make(chan []byte),
 
 		StopChan: make(chan struct{}),
@@ -43,34 +43,51 @@ func NewConsumer(topic string, channel string) *Consumer {
 	return r
 }
 
-func (r *Consumer) Connect(addr, msgid string) error {
-	if atomic.LoadInt32(&r.stopFlag) == 1 {
-		return errors.New("consumer stopped")
+func (r *Consumer) ConnectByEtcd(c *etcd.Client, key, msgid string) {
+	resolver := &naming.Resolver{
+		Client:  c,
+		Timeout: 2000 * time.Millisecond,
 	}
-	atomic.StoreInt32(&r.connectedFlag, 1)
+	addrs := resolver.Resolve(key)
+	log.Info("Addrs:", addrs)
+	for _, addr := range addrs {
+		conn, err := r.Connect(addr, msgid)
+		if err != nil {
+			log.Error(err)
+			continue
+		}
+		r.conns = append(r.conns, conn)
+	}
+}
+
+func (r *Consumer) Connect(addr, msgid string) (*Conn, error) {
+	if atomic.LoadInt32(&r.stopFlag) == 1 {
+		return nil, errors.New("consumer stopped")
+	}
 	conn := NewConn(addr, &consumerConnDelegate{r})
 	log.Infof("(%s) connecting to nsqd", addr)
 	err := conn.Connect()
 	if err != nil {
 		conn.Close()
-		return err
+		return nil, err
 	}
 	cmd := Subscribe(r.topic, r.channel, msgid)
 	if err = conn.WriteCommand(cmd); err != nil {
 		conn.Close()
-		return fmt.Errorf("[%s] failed to subscribe to %s:%s - %s",
+		return nil, fmt.Errorf("[%s] failed to subscribe to %s:%s - %s",
 			conn, r.topic, r.channel, err.Error())
 	}
-	r.conn = conn
-	return nil
+	return conn, nil
 }
 
 func (r *Consumer) Disconnect() error {
 	r.mtx.Lock()
 	defer r.mtx.Unlock()
 
-	r.conn.Close()
-	r.conn = nil
+	for _, conn := range r.conns {
+		conn.Close()
+	}
+	r.conns = make([]*Conn, 0)
 	return nil
 }
 
@@ -100,8 +117,11 @@ func (r *Consumer) onConnClose(c *Conn) {
 }
 
 func (r *Consumer) Pull() []byte {
+	counter := atomic.AddUint64(&r.counter, 1)
+	index := counter % uint64(len(r.conns))
+	conn := r.conns[index]
 	cmd := Pull(r.topic, r.channel)
-	if err := r.conn.WriteCommand(cmd); err != nil {
+	if err := conn.WriteCommand(cmd); err != nil {
 		log.Error(err)
 		return nil
 	}
@@ -113,9 +133,11 @@ func (r *Consumer) Stop() {
 		return
 	}
 
-	err := r.conn.WriteCommand(StartClose())
-	if err != nil {
-		log.Errorf("(%s) error sending CLS - %s", r.conn.String(), err)
+	for _, conn := range r.conns {
+		err := conn.WriteCommand(StartClose())
+		if err != nil {
+			log.Errorf("(%s) error sending CLS - %s", conn.String(), err)
+		}
 	}
 
 	time.AfterFunc(time.Second*30, func() {
