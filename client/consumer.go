@@ -8,9 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	etcd "github.com/coreos/etcd/clientv3"
 	"github.com/tddhit/tools/log"
-	"github.com/tddhit/wox/naming"
 )
 
 type Consumer struct {
@@ -43,24 +41,22 @@ func NewConsumer(topic string, channel string) *Consumer {
 	return r
 }
 
-func (r *Consumer) ConnectByEtcd(c *etcd.Client, key, msgid string) {
-	resolver := &naming.Resolver{
-		Client:  c,
-		Timeout: 2000 * time.Millisecond,
+func (r *Consumer) Connect(msgid string, addrs ...string) error {
+	if len(addrs) == 0 {
+		return errors.New("no available diskqueue")
 	}
-	addrs := resolver.Resolve(key)
-	log.Info("Addrs:", addrs)
 	for _, addr := range addrs {
-		conn, err := r.Connect(addr, msgid)
+		conn, err := r.connect(msgid, addr)
 		if err != nil {
 			log.Error(err)
 			continue
 		}
 		r.conns = append(r.conns, conn)
 	}
+	return nil
 }
 
-func (r *Consumer) Connect(addr, msgid string) (*Conn, error) {
+func (r *Consumer) connect(msgid, addr string) (*Conn, error) {
 	if atomic.LoadInt32(&r.stopFlag) == 1 {
 		return nil, errors.New("consumer stopped")
 	}

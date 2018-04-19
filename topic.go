@@ -89,7 +89,7 @@ func (t *Topic) GetChannel(channelName, msgid string) *Channel {
 	}
 	id, _ := strconv.ParseUint(msgid, 10, 64)
 	readChan, _ := t.StartRead(id)
-	channel := NewChannel(t.name, channelName, readChan)
+	channel := NewChannel(channelName, t, readChan)
 	t.channelMap.Store(channelName, channel)
 	t.Unlock()
 
@@ -186,7 +186,6 @@ func (t *Topic) readLoop(seg *segment, pos uint32, msgid uint64,
 	var err error
 
 	for {
-		log.Info("exitFlag", t.exitFlag)
 		if atomic.LoadInt32(&t.exitFlag) == 1 {
 			goto exit
 		}
@@ -351,4 +350,10 @@ func (t *Topic) sync() error {
 	}
 	t.needSync = false
 	return nil
+}
+
+func (t *Topic) RemoveChannel(channel string) {
+	c := t.GetChannel(channel, "0")
+	c.Close()
+	t.channelMap.Delete(channel)
 }

@@ -195,7 +195,7 @@ func (p *protocol) messagePump(
 			if err != nil {
 				sendErr := p.Send(client, frameTypeError, []byte(err.Error()))
 				if sendErr != nil {
-					log.Errorf("[%s] - %s%s", client, sendErr)
+					log.Errorf("[%s] - %s", client, sendErr)
 					goto exit
 				}
 				continue

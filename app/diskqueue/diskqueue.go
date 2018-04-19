@@ -2,6 +2,8 @@ package main
 
 import (
 	"flag"
+	"strings"
+	"time"
 
 	"net/http"
 	_ "net/http/pprof"
@@ -14,37 +16,53 @@ import (
 )
 
 var (
-	address  string
-	dataPath string
+	etcdAddrs  string
+	registry   string
+	listenAddr string
+	profAddr   string
+	dataPath   string
+	logPath    string
+	logLevel   int
 )
 
 func init() {
-	flag.StringVar(&address, "address", "0.0.0.0:18800", "tcp listen address")
-	flag.StringVar(&dataPath, "dataPath", "./default.data", "data path")
+	flag.StringVar(&etcdAddrs, "etcd-addrs", "127.0.0.1:2379", "etcd addrs")
+	flag.StringVar(&registry, "registry", "", "registry name")
+	flag.StringVar(&listenAddr, "listen-addr", "0.0.0.0:18800", "tcp listen address")
+	flag.StringVar(&profAddr, "prof-addr", "0.0.0.0:6060", "http pprof address")
+	flag.StringVar(&dataPath, "data-path", "./default.data", "data path")
+	flag.StringVar(&logPath, "log-path", "diskqueue.log", "log path")
+	flag.IntVar(&logLevel, "log-level", 1, "log level")
+	flag.Parse()
 }
 
 func main() {
-	etcdClient, err := etcd.New(etcd.Config{
-		Endpoints: []string{"localhost:2379"},
-	})
+	endpoints := strings.Split(etcdAddrs, ",")
+	cfg := etcd.Config{
+		Endpoints:   endpoints,
+		DialTimeout: 2000 * time.Millisecond,
+	}
+	etcdClient, err := etcd.New(cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
+	addr := naming.GetLocalAddr(listenAddr)
 	r := &naming.Registry{
 		Client:     etcdClient,
-		Timeout:    2000,
+		Timeout:    2000 * time.Millisecond,
 		TTL:        1,
-		Target:     "/nlpservice/diskqueue",
-		ListenAddr: ":18800",
+		Target:     registry,
+		ListenAddr: addr,
 	}
 	r.Register()
-	log.Init("diskqueue.log", log.INFO)
+	log.Init(logPath, logLevel)
 	opts := diskqueue.NewOptions()
-	opts.TCPAddress = address
+	opts.TCPAddress = addr
 	opts.DataPath = dataPath
 	dq := diskqueue.New(opts)
+	profAddr = naming.GetLocalAddr(profAddr)
 	go func() {
-		log.Debug(http.ListenAndServe("localhost:6060", nil))
+		log.Debug(http.ListenAndServe(profAddr, nil))
 	}()
 	dq.Go()
 }

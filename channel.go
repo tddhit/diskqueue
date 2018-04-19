@@ -17,19 +17,20 @@ type Consumer interface {
 type Channel struct {
 	sync.RWMutex
 
-	name      string
-	topicName string
-	clients   sync.Map
-	readChan  <-chan *Message
+	name     string
+	topic    *Topic
+	clients  sync.Map
+	readChan <-chan *Message
 
+	count    int32
 	exitFlag int32
 }
 
-func NewChannel(topicName, channelName string, readChan <-chan *Message) *Channel {
+func NewChannel(channelName string, topic *Topic, readChan <-chan *Message) *Channel {
 	c := &Channel{
-		name:      channelName,
-		topicName: topicName,
-		readChan:  readChan,
+		name:     channelName,
+		topic:    topic,
+		readChan: readChan,
 	}
 	return c
 }
@@ -52,11 +53,16 @@ func (c *Channel) exit() error {
 }
 
 func (c *Channel) AddClient(clientID int64, client Consumer) {
+	atomic.AddInt32(&c.count, 1)
 	c.clients.LoadOrStore(clientID, client)
 }
 
 func (c *Channel) RemoveClient(clientID int64) {
+	count := atomic.AddInt32(&c.count, -1)
 	c.clients.Delete(clientID)
+	if count == 0 {
+		c.topic.RemoveChannel(c.name)
+	}
 }
 
 func (c *Channel) GetMessage() *Message {
