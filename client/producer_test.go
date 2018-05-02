@@ -9,7 +9,7 @@ import (
 )
 
 func produce(i int) {
-	p := NewProducer("127.0.0.1:18800")
+	p := NewProducer("172.17.202.195:18800")
 	var j = 0
 	for j = i * 10000; j < i*10000+10000; j++ {
 		d := "hello" + strconv.Itoa(j)
@@ -23,7 +23,7 @@ func produce(i int) {
 }
 
 func TestProducer(t *testing.T) {
-	log.Init("producer.log", log.DEBUG)
+	log.Init("producer.log", log.INFO)
 	var wg sync.WaitGroup
 	for i := 0; i < 10; i++ {
 		wg.Add(1)

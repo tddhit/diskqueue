@@ -10,7 +10,7 @@ import (
 
 	etcd "github.com/coreos/etcd/clientv3"
 
-	"github.com/tddhit/diskqueue"
+	"github.com/tddhit/diskqueue/server"
 	"github.com/tddhit/tools/log"
 	"github.com/tddhit/wox/naming"
 )

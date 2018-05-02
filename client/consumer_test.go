@@ -5,25 +5,21 @@ import (
 	"sync"
 	"testing"
 
-	etcd "github.com/coreos/etcd/clientv3"
 	"github.com/tddhit/tools/log"
 )
 
 func consume(i int) {
-	etcdClient, err := etcd.New(etcd.Config{
-		Endpoints: []string{"localhost:2379"},
-	})
+	c := NewConsumer("topic1", "channel"+strconv.Itoa(i))
+	err := c.Connect("172.17.202.195:18800", "10")
 	if err != nil {
 		log.Fatal(err)
 	}
-	c := NewConsumer("topic1", "channel"+strconv.Itoa(i))
-	c.ConnectByEtcd(etcdClient, "/nlpservice/diskqueue", strconv.Itoa(i))
 	for {
 		msg := c.Pull()
 		if msg == nil {
 			break
 		}
-		log.Info("Consume", i, string(msg))
+		log.Info("Consume", i, msg.Id, string(msg.Data))
 	}
 }
 

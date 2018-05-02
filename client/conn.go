@@ -9,6 +9,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/tddhit/diskqueue/types"
 	"github.com/tddhit/tools/log"
 )
 
@@ -139,7 +140,13 @@ func (c *Conn) readLoop() {
 		case FrameTypeResponse:
 			c.delegate.OnResponse(c, data)
 		case FrameTypeMessage:
-			c.delegate.OnMessage(c, data)
+			msg, err := types.DecodeMessage(data)
+			if err != nil {
+				log.Error(err)
+				c.delegate.OnIOError(c, err)
+				goto exit
+			}
+			c.delegate.OnMessage(c, msg)
 		case FrameTypeError:
 			log.Errorf("protocol error - %s", data)
 			c.delegate.OnError(c, data)
