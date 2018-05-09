@@ -57,7 +57,7 @@ func newClient(id int64, conn net.Conn) *client {
 		Reader: bufio.NewReaderSize(conn, defaultBufferSize),
 		Writer: bufio.NewWriterSize(conn, defaultBufferSize),
 
-		HeartbeatInterval: 1800 * time.Millisecond,
+		HeartbeatInterval: 1800 * time.Second,
 		ExitChan:          make(chan int),
 		ConnectTime:       time.Now(),
 		State:             stateInit,
