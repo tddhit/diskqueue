@@ -21,7 +21,7 @@ func (d *consumerConnDelegate) OnIOError(c *Conn, err error)        { d.r.onConn
 func (d *consumerConnDelegate) OnClose(c *Conn)                     { d.r.onConnClose(c) }
 
 type producerConnDelegate struct {
-	w *Producer
+	w *producer
 }
 
 func (d *producerConnDelegate) OnResponse(c *Conn, data []byte)     { d.w.onConnResponse(c, data) }

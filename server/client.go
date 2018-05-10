@@ -42,8 +42,7 @@ type client struct {
 	lenBuf   [4]byte
 	lenSlice []byte
 
-	ExitChan     chan int
-	SubEventChan chan *Channel
+	ExitChan chan int
 }
 
 func newClient(id int64, conn net.Conn) *client {
@@ -63,7 +62,6 @@ func newClient(id int64, conn net.Conn) *client {
 		State:             stateInit,
 		ClientID:          identifier,
 		Hostname:          identifier,
-		SubEventChan:      make(chan *Channel, 1),
 	}
 	c.lenSlice = c.lenBuf[:]
 	return c

@@ -23,7 +23,7 @@ type Channel struct {
 
 	name     string
 	topic    *Topic
-	clients  sync.Map
+	client   Consumer
 	readChan chan *types.Message
 
 	count    int32
@@ -81,17 +81,19 @@ exit:
 	log.Infof("channel(%s:%s) exit readLoop.", c.topic.name, c.name)
 }
 
-func (c *Channel) AddClient(clientID int64, client Consumer) {
-	atomic.AddInt32(&c.count, 1)
-	c.clients.LoadOrStore(clientID, client)
+func (c *Channel) AddClient(client Consumer) error {
+	c.Lock()
+	defer c.Unlock()
+
+	if c.client != nil {
+		return errors.New("already subscribe")
+	}
+	c.client = client
+	return nil
 }
 
-func (c *Channel) RemoveClient(clientID int64) {
-	count := atomic.AddInt32(&c.count, -1)
-	c.clients.Delete(clientID)
-	if count == 0 {
-		c.topic.RemoveChannel(c.name)
-	}
+func (c *Channel) RemoveClient() {
+	c.topic.RemoveChannel(c.name)
 }
 
 func (c *Channel) GetMessage() *types.Message {
@@ -107,9 +109,6 @@ func (c *Channel) exit() error {
 		return ErrAlreadyExit
 	}
 
-	c.clients.Range(func(key, value interface{}) bool {
-		value.(Consumer).Close()
-		return true
-	})
+	c.client.Close()
 	return nil
 }

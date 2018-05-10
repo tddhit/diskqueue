@@ -96,7 +96,7 @@ func (p *protocol) IOLoop(ctx context.Context, conn net.Conn) error {
 	conn.Close()
 	close(client.ExitChan) //通知messagePump退出
 	if client.Channel != nil {
-		client.Channel.RemoveClient(client.ID)
+		client.Channel.RemoveClient()
 	}
 	return err
 }
@@ -239,7 +239,11 @@ exit:
 	}
 }
 
-func (p *protocol) SUB(ctx context.Context, client *client, params [][]byte) (int32, []byte, error) {
+func (p *protocol) SUB(
+	ctx context.Context,
+	client *client,
+	params [][]byte) (int32, []byte, error) {
+
 	if atomic.LoadInt32(&client.State) != stateInit {
 		return frameTypeError, nil, errors.New("cannot SUB in current state")
 	}
@@ -257,11 +261,13 @@ func (p *protocol) SUB(ctx context.Context, client *client, params [][]byte) (in
 	if err != nil {
 		return frameTypeError, nil, errors.New("not found msgid")
 	}
-	channel.AddClient(client.ID, client)
+	err = channel.AddClient(client)
+	if err != nil {
+		return frameTypeError, nil, errors.New("already subscribe")
+	}
 	atomic.StoreInt32(&client.State, stateSubscribed)
 	client.Channel = channel
-	client.SubEventChan <- channel
-	return frameTypeResponse, okBytes, nil
+	return frameTypeResponse, []byte("SUB_OK-" + msgid), nil
 }
 
 func (p *protocol) CLS(ctx context.Context, client *client, params [][]byte) (int32, []byte, error) {

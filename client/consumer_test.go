@@ -1,18 +1,19 @@
 package client
 
 import (
-	"strconv"
 	"sync"
 	"testing"
+	"time"
 
+	etcd "github.com/coreos/etcd/clientv3"
 	"github.com/tddhit/tools/log"
 )
 
-func consume(i int) {
-	c := NewConsumer("topic1", "channel"+strconv.Itoa(i))
-	err := c.Connect("172.17.202.195:18800", "10")
+func consume(i int, ec *etcd.Client) {
+	c, err := NewConsumer(ec, "/diskqueue", "topic1", "channel")
 	if err != nil {
-		log.Fatal(err)
+		log.Error(err)
+		return
 	}
 	for {
 		msg := c.Pull()
@@ -25,13 +26,23 @@ func consume(i int) {
 
 func TestConsumer(t *testing.T) {
 	log.Init("consumer.log", log.INFO)
+
+	cfg := etcd.Config{
+		Endpoints:   []string{"127.0.0.1:2379"},
+		DialTimeout: 2000 * time.Millisecond,
+	}
+	etcdClient, err := etcd.New(cfg)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	var wg sync.WaitGroup
 	for i := 0; i < 10; i++ {
 		wg.Add(1)
-		go func(i int) {
-			consume(i)
+		go func(i int, c *etcd.Client) {
+			consume(i, c)
 			wg.Done()
-		}(i)
+		}(i, etcdClient)
 	}
 	wg.Wait()
 }

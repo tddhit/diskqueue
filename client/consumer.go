@@ -1,21 +1,26 @@
 package client
 
 import (
-	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	etcd "github.com/coreos/etcd/clientv3"
+
 	"github.com/tddhit/diskqueue/types"
 	"github.com/tddhit/tools/log"
+	"github.com/tddhit/wox/naming"
 )
 
 type Consumer struct {
 	mtx sync.RWMutex
 
+	ec       *etcd.Client
 	topic    string
 	channel  string
 	messages chan *types.Message
@@ -29,13 +34,20 @@ type Consumer struct {
 	stopFlag    int32
 	stopHandler sync.Once
 	exitHandler sync.Once
+	subHandler  sync.Once
 
 	StopChan chan struct{}
 	exitChan chan struct{}
+	subChan  chan struct{}
 }
 
-func NewConsumer(topic string, channel string) *Consumer {
+func NewConsumer(
+	c *etcd.Client,
+	registry string,
+	topic string,
+	channel string) (*Consumer, error) {
 	r := &Consumer{
+		ec:       c,
 		topic:    topic,
 		channel:  channel,
 		messages: make(chan *types.Message),
@@ -44,8 +56,33 @@ func NewConsumer(topic string, channel string) *Consumer {
 
 		StopChan: make(chan struct{}),
 		exitChan: make(chan struct{}),
+		subChan:  make(chan struct{}),
 	}
-	return r
+
+	resolver := &naming.Resolver{
+		Client:  c,
+		Timeout: 2 * time.Second,
+	}
+	addrs := resolver.Resolve(registry)
+
+	for _, addr := range addrs {
+		key := fmt.Sprintf("/msgid/%s/%s/%s", topic, channel, addr)
+		ctx, _ := context.WithTimeout(context.Background(), 2*time.Second)
+		rsp, err := c.Get(ctx, key)
+		if err != nil {
+			return nil, err
+		}
+		msgid := "0"
+		if len(rsp.Kvs) > 0 {
+			msgid = string(rsp.Kvs[0].Value)
+		}
+		if err = r.Connect(addr, msgid); err != nil {
+			log.Error(err)
+		}
+	}
+	go r.commitMsgid()
+
+	return r, nil
 }
 
 func (r *Consumer) Connect(addr, msgid string) error {
@@ -65,13 +102,6 @@ func (r *Consumer) Connect(addr, msgid string) error {
 		return fmt.Errorf("[%s] failed to subscribe to %s:%s - %s",
 			conn, r.topic, r.channel, err.Error())
 	}
-
-	r.mtx.Lock()
-	r.conn[addr] = conn
-	r.msgid[addr] = msgid
-	r.conns = append(r.conns, addr)
-	r.addrs = append(r.addrs, addr)
-	r.mtx.Unlock()
 
 	return nil
 }
@@ -106,14 +136,28 @@ func (r *Consumer) onConnMessage(c *Conn, msg *types.Message) {
 }
 
 func (r *Consumer) onConnResponse(c *Conn, data []byte) {
+	str := string(data)
 	switch {
-	case bytes.Equal(data, []byte("CLOSE_WAIT")):
+	case str == "OK":
+	case str == "CLOSE_WAIT":
 		log.Infof("(%s) received CLOSE_WAIT from diskqueue", c.String())
 		c.Close()
+	case strings.HasPrefix(str, "SUB_OK-"):
+		msgid := strings.Split(str, "-")[1]
+		r.mtx.Lock()
+		r.conn[c.String()] = c
+		r.msgid[c.String()] = msgid
+		r.conns = append(r.conns, c.String())
+		r.addrs = append(r.addrs, c.String())
+		r.mtx.Unlock()
+		r.subHandler.Do(func() {
+			close(r.subChan)
+		})
 	}
 }
 
-func (r *Consumer) onConnError(c *Conn, data []byte) {}
+func (r *Consumer) onConnError(c *Conn, data []byte) {
+}
 
 func (r *Consumer) onConnIOError(c *Conn, err error) {
 	c.Close()
@@ -165,18 +209,47 @@ func (r *Consumer) onConnClose(c *Conn) {
 	}
 }
 
+func (r *Consumer) commitMsgid() {
+	ticker := time.NewTicker(2 * time.Second)
+	for range ticker.C {
+		if atomic.LoadInt32(&r.stopFlag) == 1 {
+			break
+		}
+		conns := r.connections()
+		msgid := r.copyMsgid()
+		log.Error(msgid)
+		for _, conn := range conns {
+			key := fmt.Sprintf("/msgid/%s/%s/%s", r.topic, r.channel, conn.String())
+			ctx, _ := context.WithTimeout(context.Background(), 100*time.Millisecond)
+			_, err := r.ec.Put(ctx, key, msgid[conn.String()])
+			if err != nil {
+				log.Error(err)
+			}
+		}
+	}
+}
+
 func (r *Consumer) Pull() *types.Message {
+	<-r.subChan
 	counter := atomic.AddUint64(&r.counter, 1)
+
+	r.mtx.RLock()
 	index := counter % uint64(len(r.conns))
 	addr := r.conns[index]
 	conn, _ := r.conn[addr]
+	r.mtx.RUnlock()
+
 	cmd := Pull(r.topic, r.channel)
 	if err := conn.WriteCommand(cmd); err != nil {
 		log.Error(err)
 		return nil
 	}
 	msg := <-r.messages
-	r.msgid[conn.String()] = strconv.FormatUint(msg.Id, 10)
+
+	r.mtx.Lock()
+	r.msgid[conn.String()] = strconv.FormatUint(msg.Id+1, 10)
+	r.mtx.Unlock()
+
 	return msg
 }
 
@@ -188,6 +261,17 @@ func (r *Consumer) connections() []*Conn {
 	}
 	r.mtx.RUnlock()
 	return conns
+}
+
+func (r *Consumer) copyMsgid() map[string]string {
+	r.mtx.RLock()
+	defer r.mtx.RUnlock()
+
+	msgid := make(map[string]string)
+	for k, v := range r.msgid {
+		msgid[k] = v
+	}
+	return msgid
 }
 
 func (r *Consumer) Stop() {
