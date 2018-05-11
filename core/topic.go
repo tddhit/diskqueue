@@ -134,7 +134,8 @@ func (t *Topic) seek(msgid uint64) (seg *segment, pos uint32, err error) {
 }
 
 func (t *Topic) createSegment(msgid uint64) (err error) {
-	seg, err := newSegment(t.dataPath, t.name, msgid, os.O_CREATE|os.O_RDWR|os.O_APPEND)
+	seg, err := newSegment(t.dataPath, t.name,
+		os.O_CREATE|os.O_RDWR|os.O_APPEND, msgid, msgid)
 	if err != nil {
 		return
 	}
@@ -204,11 +205,11 @@ func (t *Topic) persistMetaData() error {
 	for _, seg := range t.segs {
 		buf.WriteString(strconv.FormatUint(seg.minMsgid, 10))
 		buf.WriteString(",")
+		buf.WriteString(strconv.FormatUint(seg.maxMsgid, 10))
+		buf.WriteString(",")
 		buf.WriteString(strconv.FormatUint(uint64(seg.size), 10))
 		buf.WriteString(",")
 		buf.WriteString(strconv.FormatUint(uint64(seg.indexCount), 10))
-		buf.WriteString(",")
-		buf.WriteString(strconv.FormatUint(uint64(seg.msgCount), 10))
 		buf.WriteString("\n")
 	}
 	_, err = f.Write(buf.Bytes())
@@ -240,33 +241,32 @@ func (t *Topic) loadMetaData() error {
 			if len(tokens) != 4 {
 				return ErrMetaData
 			}
-			msgid, err := strconv.ParseUint(tokens[0], 10, 64)
+			minMsgid, err := strconv.ParseUint(tokens[0], 10, 64)
 			if err != nil {
 				return err
 			}
-			r, err := strconv.ParseUint(tokens[1], 10, 32)
+			maxMsgid, err := strconv.ParseUint(tokens[1], 10, 64)
+			if err != nil {
+				return err
+			}
+			r, err := strconv.ParseUint(tokens[2], 10, 32)
 			if err != nil {
 				return err
 			}
 			pos := uint32(r)
-			r, err = strconv.ParseUint(tokens[2], 10, 32)
-			if err != nil {
-				return err
-			}
-			indexCount := uint32(r)
 			r, err = strconv.ParseUint(tokens[3], 10, 32)
 			if err != nil {
 				return err
 			}
-			msgCount := uint32(r)
+			indexCount := uint32(r)
 			var flag int
 			if i != len(lines)-1 {
 				flag = os.O_RDONLY
 			} else {
 				flag = os.O_CREATE | os.O_RDWR | os.O_APPEND
 			}
-			seg, err := newSegment(t.dataPath, t.name, msgid, flag,
-				pos, indexCount, msgCount)
+			seg, err := newSegment(t.dataPath, t.name, flag,
+				minMsgid, maxMsgid, pos, indexCount)
 			if err != nil {
 				return err
 			}

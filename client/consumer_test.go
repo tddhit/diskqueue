@@ -10,7 +10,13 @@ import (
 )
 
 func consume(i int, ec *etcd.Client) {
-	c, err := NewConsumer(ec, "/diskqueue", "topic1", "channel")
+	var channel string
+	if i%2 == 0 {
+		channel = "channel0"
+	} else {
+		channel = "channel1"
+	}
+	c, err := NewConsumer(ec, "/diskqueue", "topic1", channel)
 	if err != nil {
 		log.Error(err)
 		return

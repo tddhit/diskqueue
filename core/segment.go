@@ -31,9 +31,9 @@ var (
 
 type segment struct {
 	minMsgid   uint64
+	maxMsgid   uint64
 	size       uint32
 	indexCount uint32
-	msgCount   uint32
 
 	indexFile *os.File
 	logFile   *os.File
@@ -44,17 +44,27 @@ type segment struct {
 	indexs   indexs
 }
 
-func newSegment(dataPath, name string, msgid uint64, flag int, meta ...uint32) (*segment, error) {
+func newSegment(
+	dataPath string,
+	name string,
+	flag int,
+	minMsgid uint64,
+	maxMsgid uint64,
+	meta ...uint32) (*segment, error) {
+
 	s := &segment{
-		minMsgid: msgid,
+		minMsgid: minMsgid,
+		maxMsgid: maxMsgid,
 	}
-	fileName := fmt.Sprintf(path.Join(dataPath, "%s.diskqueue.%d.log"), name, msgid)
+	fileName := fmt.Sprintf(path.Join(dataPath, "%s.diskqueue.%d.log"),
+		name, minMsgid)
 	f, err := os.OpenFile(fileName, flag, 0600)
 	if err != nil {
 		return nil, err
 	}
 	s.logFile = f
-	fileName = fmt.Sprintf(path.Join(dataPath, "%s.diskqueue.%d.idx"), name, msgid)
+	fileName = fmt.Sprintf(path.Join(dataPath, "%s.diskqueue.%d.idx"),
+		name, minMsgid)
 	f, err = os.OpenFile(fileName, flag, 0600)
 	if err != nil {
 		return nil, err
@@ -63,10 +73,9 @@ func newSegment(dataPath, name string, msgid uint64, flag int, meta ...uint32) (
 	if err := s.mmap(); err != nil {
 		return nil, err
 	}
-	if len(meta) == 3 {
+	if len(meta) == 2 {
 		s.size = meta[0]
 		s.indexCount = meta[1]
-		s.msgCount = meta[2]
 	}
 	if err := s.loadIndex(); err != nil {
 		return nil, err
@@ -181,7 +190,6 @@ func (s *segment) writeOne(msg *types.Message) error {
 	}
 	dataLen := 12 + uint32(len(msg.Data))
 	size := atomic.AddUint32(&s.size, dataLen)
-	atomic.AddUint32(&s.msgCount, 1)
 	oldSize := size - dataLen
 	if (size/IndexInterval)-(oldSize/IndexInterval) > 0 || oldSize == 0 {
 		offset := uint32(msg.Id - s.minMsgid)
@@ -190,6 +198,7 @@ func (s *segment) writeOne(msg *types.Message) error {
 		}
 		atomic.AddUint32(&s.indexCount, 1)
 	}
+	atomic.AddUint64(&s.maxMsgid, 1)
 	return nil
 }
 

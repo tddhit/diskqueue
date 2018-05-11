@@ -41,7 +41,7 @@ func TestProducer(t *testing.T) {
 	}
 
 	var wg sync.WaitGroup
-	for i := 0; i < 100; i++ {
+	for i := 0; i < 50; i++ {
 		wg.Add(1)
 		go func(i int, ec *etcd.Client) {
 			produce(i, ec)

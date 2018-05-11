@@ -43,26 +43,38 @@ func NewChannel(
 
 		exitChan: make(chan struct{}),
 	}
-	seg, pos, err := c.topic.seek(msgid)
-	if err != nil {
-		return nil, err
-	}
-	go c.readLoop(seg, pos, msgid)
+	go c.readLoop(msgid)
 	return c, nil
 }
 
-func (c *Channel) readLoop(seg *segment, pos uint32, msgid uint64) {
-	var msg *types.Message
-	var err error
+func (c *Channel) readLoop(msgid uint64) {
+	var (
+		seg *segment
+		pos uint32
+		msg *types.Message
+		err error
+	)
 	for {
 		if atomic.LoadInt32(&c.exitFlag) == 1 {
 			goto exit
 		}
-		curMsgid := atomic.LoadUint64(&c.topic.msgid)
-		if msgid < curMsgid {
-			msg, pos, err = seg.readOne(msgid, pos)
+		if seg == nil {
+			seg, pos, err = c.topic.seek(msgid)
 			if err != nil {
 				log.Fatal(err)
+			}
+		}
+		curMsgid := atomic.LoadUint64(&c.topic.msgid)
+		if msgid < curMsgid {
+			segMaxMsgid := atomic.LoadUint64(&seg.maxMsgid)
+			if msgid < segMaxMsgid {
+				msg, pos, err = seg.readOne(msgid, pos)
+				if err != nil {
+					log.Fatal(err)
+				}
+			} else {
+				seg = nil
+				continue
 			}
 		} else {
 			time.Sleep(100 * time.Millisecond)
