@@ -49,8 +49,8 @@ func main() {
 	addr := naming.GetLocalAddr(listenAddr)
 	r := &naming.Registry{
 		Client:     etcdClient,
-		Timeout:    2000 * time.Millisecond,
-		TTL:        1,
+		Timeout:    2 * time.Second,
+		TTL:        3,
 		Target:     registry,
 		ListenAddr: addr,
 	}

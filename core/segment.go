@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	MaxSegmentSize = 1 << 22 // 512M
+	MaxSegmentSize = 1 << 29 // 512M
 	MaxMsgSize     = 1 << 22 // 4M
 	MaxMapSize     = 1 << 30 // 1G
 	IndexInterval  = 1 << 19 // 512K

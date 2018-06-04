@@ -217,7 +217,6 @@ func (r *Consumer) commitMsgid() {
 		}
 		conns := r.connections()
 		msgid := r.copyMsgid()
-		log.Error(msgid)
 		for _, conn := range conns {
 			key := fmt.Sprintf("/msgid/%s/%s/%s", r.topic, r.channel, conn.String())
 			ctx, _ := context.WithTimeout(context.Background(), 100*time.Millisecond)
