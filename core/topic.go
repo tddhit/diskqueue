@@ -3,6 +3,7 @@ package core
 import (
 	"bytes"
 	"errors"
+	"expvar"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -14,6 +15,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unsafe"
 
 	"github.com/tddhit/diskqueue/types"
 	"github.com/tddhit/tools/log"
@@ -27,12 +29,18 @@ var (
 	ErrAlreadyClose    = errors.New("diskqueue already close")
 )
 
+type MsgID uint64
+
+func (m MsgID) String() string {
+	return strconv.FormatUint(atomic.LoadUint64((*uint64)(unsafe.Pointer(&m))), 10)
+}
+
 type Topic struct {
 	sync.RWMutex
 
 	name     string
 	dataPath string
-	msgid    uint64
+	msgid    MsgID
 
 	channelMap sync.Map
 
@@ -76,6 +84,8 @@ func NewTopic(dataPath, topic string) (*Topic, error) {
 	}
 	t.exitSyncWg.Add(1)
 	go t.writeLoop()
+	log.Info(t.msgid)
+	expvar.Publish(topic+"-inQueue", &t.msgid)
 	return t, nil
 }
 
@@ -154,7 +164,7 @@ func (t *Topic) writeOne(msg *types.Message) error {
 		return err
 	}
 	log.Debugf("writeOne\tid=%d\tdata=%s", msg.Id, string(msg.Data))
-	atomic.AddUint64(&t.msgid, 1)
+	atomic.AddUint64((*uint64)(unsafe.Pointer(&t.msgid)), 1)
 	return nil
 }
 
@@ -175,7 +185,7 @@ func (t *Topic) writeLoop() {
 		select {
 		case msg := <-t.writeChan:
 			count++
-			msg.Id = atomic.LoadUint64(&t.msgid)
+			msg.Id = atomic.LoadUint64((*uint64)(unsafe.Pointer(&t.msgid)))
 			t.writeResponseChan <- t.writeOne(msg)
 		case <-syncTicker.C:
 			if count == 0 {
@@ -200,7 +210,7 @@ func (t *Topic) persistMetaData() error {
 		return err
 	}
 	var buf bytes.Buffer
-	buf.WriteString(strconv.FormatUint(t.msgid, 10))
+	buf.WriteString(strconv.FormatUint(*(*uint64)(unsafe.Pointer(&t.msgid)), 10))
 	buf.WriteString("\n")
 	for _, seg := range t.segs {
 		buf.WriteString(strconv.FormatUint(seg.minMsgid, 10))
@@ -235,7 +245,7 @@ func (t *Topic) loadMetaData() error {
 			if err != nil {
 				return err
 			}
-			t.msgid = msgid
+			t.msgid = MsgID(msgid)
 		} else {
 			tokens := strings.Split(lines[i], ",")
 			if len(tokens) != 4 {

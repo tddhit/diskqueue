@@ -2,9 +2,12 @@ package core
 
 import (
 	"errors"
+	"expvar"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
+	"unsafe"
 
 	"github.com/tddhit/diskqueue/types"
 	"github.com/tddhit/tools/log"
@@ -16,6 +19,7 @@ var (
 
 type Consumer interface {
 	Close() error
+	Id() int64
 }
 
 type Channel struct {
@@ -26,7 +30,8 @@ type Channel struct {
 	client   Consumer
 	readChan chan *types.Message
 
-	count    int32
+	outQueue *expvar.Int
+
 	exitFlag int32
 	exitChan chan struct{}
 }
@@ -64,7 +69,7 @@ func (c *Channel) readLoop(msgid uint64) {
 				log.Fatal(err)
 			}
 		}
-		curMsgid := atomic.LoadUint64(&c.topic.msgid)
+		curMsgid := atomic.LoadUint64((*uint64)(unsafe.Pointer(&c.topic.msgid)))
 		if msgid < curMsgid {
 			segMaxMsgid := atomic.LoadUint64(&seg.maxMsgid)
 			if msgid < segMaxMsgid {
@@ -83,6 +88,7 @@ func (c *Channel) readLoop(msgid uint64) {
 		select {
 		case c.readChan <- msg:
 			msgid++
+			c.outQueue.Add(1)
 		case <-c.exitChan:
 			log.Info("receive exitChan")
 			goto exit
@@ -101,6 +107,8 @@ func (c *Channel) AddClient(client Consumer) error {
 		return errors.New("already subscribe")
 	}
 	c.client = client
+	c.outQueue = expvar.NewInt(fmt.Sprintf("%s-%s-%s(%d)-outQueue",
+		c.topic.name, c.name, c.client, c.client.Id()))
 	return nil
 }
 

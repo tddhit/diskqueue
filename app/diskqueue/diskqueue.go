@@ -1,6 +1,7 @@
 package main
 
 import (
+	"expvar"
 	"flag"
 	"strings"
 	"time"
@@ -62,7 +63,11 @@ func main() {
 	dq := diskqueue.New(opts)
 	profAddr = naming.GetLocalAddr(profAddr)
 	go func() {
-		log.Debug(http.ListenAndServe(profAddr, nil))
+		s := &http.Server{
+			Addr:    profAddr,
+			Handler: expvar.Handler(),
+		}
+		s.ListenAndServe()
 	}()
 	dq.Go()
 }

@@ -71,6 +71,10 @@ func (c *client) String() string {
 	return c.RemoteAddr().String()
 }
 
+func (c *client) Id() int64 {
+	return c.ID
+}
+
 func (c *client) StartClose() {
 	atomic.StoreInt32(&c.State, stateClosing)
 }

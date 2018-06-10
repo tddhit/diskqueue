@@ -41,7 +41,8 @@ func (p *protocol) IOLoop(ctx context.Context, conn net.Conn) error {
 	var err error
 	var line []byte
 
-	clientID := atomic.AddInt64(&ctx.Value("diskqueue").(*DiskQueue).clientID, 1)
+	dq := ctx.Value("diskqueue").(*DiskQueue)
+	clientID := atomic.AddInt64(&dq.clientID, 1)
 	client := newClient(clientID, conn)
 
 	messagePumpStartedChan := make(chan bool)
@@ -174,16 +175,13 @@ exit:
 }
 
 func (p *protocol) SendMessage(client *client, msg *types.Message) error {
-	log.Info("!!")
 	var buf bytes.Buffer
 	_, err := msg.WriteTo(&buf)
 	if err != nil {
-		log.Info("!!")
 		return err
 	}
 	err = p.Send(client, frameTypeMessage, buf.Bytes())
 	if err != nil {
-		log.Info("!!")
 		return err
 	}
 	log.Info("SendMessage:", msg.Id, string(msg.Data))
