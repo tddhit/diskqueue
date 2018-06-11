@@ -17,17 +17,22 @@ import (
 	"github.com/tddhit/wox/naming"
 )
 
+type Message struct {
+	*types.Message
+	conn *Conn
+}
+
 type Consumer struct {
 	mtx sync.RWMutex
 
 	ec       *etcd.Client
 	topic    string
 	channel  string
-	messages chan *types.Message
+	messages chan *Message
 	conn     map[string]*Conn
-	conns    []string
-	addrs    []string
 	msgid    map[string]string
+	addrs    []string
+	cmdChan  sync.Map
 
 	wg          sync.WaitGroup
 	counter     uint64
@@ -50,7 +55,7 @@ func NewConsumer(
 		ec:       c,
 		topic:    topic,
 		channel:  channel,
-		messages: make(chan *types.Message),
+		messages: make(chan *Message),
 		conn:     make(map[string]*Conn),
 		msgid:    make(map[string]string),
 
@@ -103,6 +108,19 @@ func (r *Consumer) Connect(addr, msgid string) error {
 			conn, r.topic, r.channel, err.Error())
 	}
 
+	cmdChan := make(chan struct{})
+	r.cmdChan.Store(conn.String(), cmdChan)
+
+	go func() {
+		for {
+			<-cmdChan
+			cmd := Pull(r.topic, r.channel)
+			if err := conn.WriteCommand(cmd); err != nil {
+				log.Error(err)
+			}
+		}
+	}()
+
 	return nil
 }
 
@@ -132,7 +150,7 @@ func (r *Consumer) Disconnect(addr string) error {
 }
 
 func (r *Consumer) onConnMessage(c *Conn, msg *types.Message) {
-	r.messages <- msg
+	r.messages <- &Message{msg, c}
 }
 
 func (r *Consumer) onConnResponse(c *Conn, data []byte) {
@@ -147,7 +165,6 @@ func (r *Consumer) onConnResponse(c *Conn, data []byte) {
 		r.mtx.Lock()
 		r.conn[c.String()] = c
 		r.msgid[c.String()] = msgid
-		r.conns = append(r.conns, c.String())
 		r.addrs = append(r.addrs, c.String())
 		r.mtx.Unlock()
 		r.subHandler.Do(func() {
@@ -166,9 +183,7 @@ func (r *Consumer) onConnIOError(c *Conn, err error) {
 func (r *Consumer) onConnClose(c *Conn) {
 	r.mtx.Lock()
 	delete(r.conn, c.String())
-	idx := indexOf(c.String(), r.conns)
-	r.conns = append(r.conns[:idx], r.conns[idx+1:]...)
-	left := len(r.conns)
+	left := len(r.conn)
 	r.mtx.Unlock()
 
 	if atomic.LoadInt32(&r.stopFlag) == 1 {
@@ -230,26 +245,31 @@ func (r *Consumer) commitMsgid() {
 
 func (r *Consumer) Pull() *types.Message {
 	<-r.subChan
-	counter := atomic.AddUint64(&r.counter, 1)
 
-	r.mtx.RLock()
-	index := counter % uint64(len(r.conns))
-	addr := r.conns[index]
-	conn, _ := r.conn[addr]
-	r.mtx.RUnlock()
-
-	cmd := Pull(r.topic, r.channel)
-	if err := conn.WriteCommand(cmd); err != nil {
-		log.Error(err)
-		return nil
+	var msg *Message
+	select {
+	case msg = <-r.messages:
+		goto Return
+	default:
 	}
-	msg := <-r.messages
+
+	r.cmdChan.Range(func(key, value interface{}) bool {
+		cmdChan := value.(chan struct{})
+		select {
+		case cmdChan <- struct{}{}:
+		default:
+		}
+		return true
+	})
+	msg = <-r.messages
+
+Return:
 
 	r.mtx.Lock()
-	r.msgid[conn.String()] = strconv.FormatUint(msg.Id+1, 10)
+	r.msgid[msg.conn.String()] = strconv.FormatUint(msg.Id+1, 10)
 	r.mtx.Unlock()
 
-	return msg
+	return msg.Message
 }
 
 func (r *Consumer) connections() []*Conn {
