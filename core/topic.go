@@ -17,7 +17,7 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/tddhit/diskqueue/types"
+	pb "github.com/tddhit/diskqueue/pb"
 	"github.com/tddhit/tools/log"
 )
 
@@ -47,7 +47,7 @@ type Topic struct {
 	curSeg *segment
 	segs   segments
 
-	writeChan         chan *types.Message
+	writeChan         chan *pb.Message
 	writeResponseChan chan error
 
 	SyncEvery    int
@@ -64,7 +64,7 @@ func NewTopic(dataPath, topic string) (*Topic, error) {
 		name:     topic,
 		dataPath: dataPath,
 
-		writeChan:         make(chan *types.Message),
+		writeChan:         make(chan *pb.Message),
 		writeResponseChan: make(chan error),
 
 		SyncEvery:    10000,
@@ -89,27 +89,21 @@ func NewTopic(dataPath, topic string) (*Topic, error) {
 	return t, nil
 }
 
-func (t *Topic) GetChannel(channelName, msgid string) (*Channel, error) {
+func (t *Topic) GetChannel(channelName string, msgid uint64) *Channel {
 	if c, ok := t.channelMap.Load(channelName); ok {
-		return c.(*Channel), nil
+		return c.(*Channel)
 	}
-
 	t.Lock()
 	if c, ok := t.channelMap.Load(channelName); ok {
 		t.Unlock()
-		return c.(*Channel), nil
+		return c.(*Channel)
 	}
-	id, _ := strconv.ParseUint(msgid, 10, 64)
-	channel, err := NewChannel(channelName, t, id)
-	if err != nil {
-		t.Unlock()
-		return nil, err
-	}
+	channel := NewChannel(channelName, t, msgid)
 	t.channelMap.Store(channelName, channel)
 	t.Unlock()
 
 	log.Debugf("CreateChannel\tTopic=%s\tChannel=%s\n", t.name, channel.name)
-	return channel, nil
+	return channel
 }
 
 func (t *Topic) PutMessage(data []byte) (err error) {
@@ -120,7 +114,7 @@ func (t *Topic) PutMessage(data []byte) (err error) {
 		return ErrAlreadyClose
 	}
 
-	msg := &types.Message{Data: data}
+	msg := &pb.Message{Data: data}
 	t.writeChan <- msg
 	return <-t.writeResponseChan
 }
@@ -154,7 +148,7 @@ func (t *Topic) createSegment(msgid uint64) (err error) {
 	return
 }
 
-func (t *Topic) writeOne(msg *types.Message) error {
+func (t *Topic) writeOne(msg *pb.Message) error {
 	if t.curSeg.full() {
 		if err := t.createSegment(msg.Id); err != nil {
 			return err
@@ -336,7 +330,7 @@ func (t *Topic) sync() error {
 }
 
 func (t *Topic) RemoveChannel(channel string) {
-	c, _ := t.GetChannel(channel, "0")
+	c := t.GetChannel(channel, 0)
 	c.close()
 	t.channelMap.Delete(channel)
 }

@@ -12,7 +12,7 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/tddhit/diskqueue/types"
+	pb "github.com/tddhit/diskqueue/pb"
 	"github.com/tddhit/tools/log"
 )
 
@@ -139,7 +139,7 @@ func (s *segment) full() bool {
 	return true
 }
 
-func (s *segment) writeLog(msg *types.Message) error {
+func (s *segment) writeLog(msg *pb.Message) error {
 	dataLen := uint32(len(msg.Data))
 	if dataLen > MaxMsgSize {
 		return fmt.Errorf("invalid message write size (%d) maxMsgSize=%d", dataLen, MaxMsgSize)
@@ -184,7 +184,7 @@ func (s *segment) writeIndex(offset, pos uint32) error {
 	return nil
 }
 
-func (s *segment) writeOne(msg *types.Message) error {
+func (s *segment) writeOne(msg *pb.Message) error {
 	if err := s.writeLog(msg); err != nil {
 		return err
 	}
@@ -219,7 +219,7 @@ func (s *segment) seek(msgid uint64) (pos uint32, err error) {
 	return
 }
 
-func (s *segment) readOne(msgid uint64, pos uint32) (msg *types.Message, nextPos uint32, err error) {
+func (s *segment) readOne(msgid uint64, pos uint32) (msg *pb.Message, nextPos uint32, err error) {
 	var (
 		id  uint64
 		len uint32
@@ -244,7 +244,7 @@ func (s *segment) readOne(msgid uint64, pos uint32) (msg *types.Message, nextPos
 		} else if id == msgid {
 			nextPos = pos + len
 			data := s.logBuf[pos : pos+len : pos+len]
-			msg = &types.Message{id, data}
+			msg = &pb.Message{Id: id, Data: data}
 			return
 		} else {
 			err = ErrNotFoundMsgid

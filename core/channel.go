@@ -9,7 +9,7 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/tddhit/diskqueue/types"
+	pb "github.com/tddhit/diskqueue/pb"
 	"github.com/tddhit/tools/log"
 )
 
@@ -18,8 +18,7 @@ var (
 )
 
 type Consumer interface {
-	Close() error
-	Id() int64
+	String() string
 }
 
 type Channel struct {
@@ -28,7 +27,7 @@ type Channel struct {
 	name     string
 	topic    *Topic
 	client   Consumer
-	readChan chan *types.Message
+	readChan chan *pb.Message
 
 	outQueue *expvar.Int
 
@@ -39,24 +38,24 @@ type Channel struct {
 func NewChannel(
 	channelName string,
 	topic *Topic,
-	msgid uint64) (*Channel, error) {
+	msgid uint64) *Channel {
 
 	c := &Channel{
 		name:     channelName,
 		topic:    topic,
-		readChan: make(chan *types.Message),
+		readChan: make(chan *pb.Message),
 
 		exitChan: make(chan struct{}),
 	}
 	go c.readLoop(msgid)
-	return c, nil
+	return c
 }
 
 func (c *Channel) readLoop(msgid uint64) {
 	var (
 		seg *segment
 		pos uint32
-		msg *types.Message
+		msg *pb.Message
 		err error
 	)
 	for {
@@ -107,8 +106,8 @@ func (c *Channel) AddClient(client Consumer) error {
 		return errors.New("already subscribe")
 	}
 	c.client = client
-	c.outQueue = expvar.NewInt(fmt.Sprintf("%s-%s-%s(%d)-outQueue",
-		c.topic.name, c.name, c.client, c.client.Id()))
+	c.outQueue = expvar.NewInt(fmt.Sprintf("%s-%s-%s-outQueue",
+		c.topic.name, c.name, c.client))
 	return nil
 }
 
@@ -116,7 +115,7 @@ func (c *Channel) RemoveClient() {
 	c.topic.RemoveChannel(c.name)
 }
 
-func (c *Channel) GetMessage() *types.Message {
+func (c *Channel) GetMessage() *pb.Message {
 	return <-c.readChan
 }
 
@@ -128,7 +127,5 @@ func (c *Channel) exit() error {
 	if !atomic.CompareAndSwapInt32(&c.exitFlag, 0, 1) {
 		return ErrAlreadyExit
 	}
-
-	c.client.Close()
 	return nil
 }
