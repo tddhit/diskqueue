@@ -12,8 +12,9 @@ import (
 	"syscall"
 	"unsafe"
 
-	pb "github.com/tddhit/diskqueue/pb"
 	"github.com/tddhit/tools/log"
+
+	pb "github.com/tddhit/diskqueue/pb"
 )
 
 const (

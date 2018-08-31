@@ -13,8 +13,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	pb "github.com/tddhit/diskqueue/pb"
 	"github.com/tddhit/tools/log"
+
+	"github.com/tddhit/diskqueue/filter"
+	pb "github.com/tddhit/diskqueue/pb"
 )
 
 type metadata struct {
@@ -41,6 +43,7 @@ type Topic struct {
 	curSeg        *segment
 	segs          segments
 	consumers     map[string]Consumer
+	filter        *filter.Bloom
 	inFlightQueue []*pb.Message
 	inFlightMap   map[uint64]*pb.Message
 	inFlightMutex sync.Mutex
@@ -61,6 +64,7 @@ func NewTopic(dataPath, topic string) (*Topic, error) {
 		dataPath:      dataPath,
 		timeout:       int64(10 * time.Second),
 		consumers:     make(map[string]Consumer),
+		filter:        filter.New(),
 		inFlightQueue: make([]*pb.Message, 100),
 		inFlightMap:   make(map[uint64]*pb.Message),
 		writeC:        make(chan *pb.Message),
@@ -164,6 +168,9 @@ func (t *Topic) createSegment(msgID uint64) (err error) {
 }
 
 func (t *Topic) writeOne(msg *pb.Message) error {
+	if t.filter.CheckOrAdd(msg.GetData()) {
+		return errors.New("already in bloomfilter.")
+	}
 	if t.curSeg.full() {
 		if err := t.createSegment(msg.ID); err != nil {
 			return err
