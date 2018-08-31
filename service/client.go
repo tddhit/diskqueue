@@ -1,8 +1,6 @@
-package handler
+package service
 
-import (
-	"github.com/tddhit/diskqueue/core"
-)
+import "github.com/tddhit/diskqueue/store"
 
 const (
 	stateInit = iota
@@ -11,9 +9,9 @@ const (
 )
 
 type Client struct {
-	State   int32
-	Addr    string
-	Channel *core.Channel
+	State int32
+	Addr  string
+	topic *store.Topic
 }
 
 func (c *Client) String() string {

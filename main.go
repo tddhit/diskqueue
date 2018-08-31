@@ -8,8 +8,8 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/tddhit/diskqueue/handler"
 	pb "github.com/tddhit/diskqueue/pb"
+	"github.com/tddhit/diskqueue/service"
 	"github.com/tddhit/tools/log"
 )
 
@@ -34,9 +34,9 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	s := grpc.NewServer(grpc.UnaryInterceptor(handler.UnaryIntercept))
-	handler := handler.NewHandler(dataPath)
-	pb.RegisterDiskqueueServer(s, handler)
+	s := grpc.NewServer(grpc.UnaryInterceptor(service.UnaryIntercept))
+	service := service.New(dataPath)
+	pb.RegisterDiskqueueServer(s, service)
 	go func() {
 		http.ListenAndServe(":6060", expvar.Handler())
 	}()

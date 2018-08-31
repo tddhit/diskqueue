@@ -9,11 +9,13 @@ service Diskqueue {
     rpc Cancel      (CancelRequest)          returns (CancelReply)              {}
     rpc Pull        (PullRequest)            returns (PullReply)                {}
     rpc KeepAlive   (KeepAliveRequest)       returns (stream KeepAliveReply)    {}
+    rpc Ack         (AckRequest)             returns (AckReply)                 {}
 }
 
 message Message {
-    uint64  id   = 1;
+    uint64  ID   = 1;
     bytes   data = 2;
+    int64   timestamp = 3;
 }
 
 message PublishRequest {
@@ -27,7 +29,7 @@ message PublishReply {
 message SubscribeRequest {
     string topic    = 1;
     string channel  = 2;
-    uint64 msgId    = 3;
+    uint64 msgID    = 3;
 }
 
 message SubscribeReply {
@@ -50,4 +52,11 @@ message KeepAliveRequest {
 }
 
 message KeepAliveReply {
+}
+
+message AckRequest {
+    uint64 msgID = 1;
+}
+
+message AckReply {
 }

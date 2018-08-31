@@ -1,4 +1,4 @@
-package core
+package store
 
 import (
 	"bytes"
@@ -30,8 +30,8 @@ var (
 )
 
 type segment struct {
-	minMsgid   uint64
-	maxMsgid   uint64
+	minID      uint64
+	maxID      uint64
 	size       uint32
 	indexCount uint32
 
@@ -44,27 +44,21 @@ type segment struct {
 	indexs   indexs
 }
 
-func newSegment(
-	dataPath string,
-	name string,
-	flag int,
-	minMsgid uint64,
-	maxMsgid uint64,
-	meta ...uint32) (*segment, error) {
+func newSegment(dataPath, name string, flag int,
+	minID, maxID uint64, meta ...uint32) (*segment, error) {
 
 	s := &segment{
-		minMsgid: minMsgid,
-		maxMsgid: maxMsgid,
+		minID: minID,
+		maxID: maxID,
 	}
-	fileName := fmt.Sprintf(path.Join(dataPath, "%s.diskqueue.%d.log"),
-		name, minMsgid)
+	fileName := fmt.Sprintf(path.Join(dataPath, "%s.diskqueue.%d.log"), name, minID)
 	f, err := os.OpenFile(fileName, flag, 0600)
 	if err != nil {
 		return nil, err
 	}
 	s.logFile = f
 	fileName = fmt.Sprintf(path.Join(dataPath, "%s.diskqueue.%d.idx"),
-		name, minMsgid)
+		name, minID)
 	f, err = os.OpenFile(fileName, flag, 0600)
 	if err != nil {
 		return nil, err
@@ -145,7 +139,7 @@ func (s *segment) writeLog(msg *pb.Message) error {
 		return fmt.Errorf("invalid message write size (%d) maxMsgSize=%d", dataLen, MaxMsgSize)
 	}
 	s.writeBuf.Reset()
-	if err := binary.Write(&s.writeBuf, binary.BigEndian, msg.Id); err != nil {
+	if err := binary.Write(&s.writeBuf, binary.BigEndian, msg.ID); err != nil {
 		return err
 	}
 	if err := binary.Write(&s.writeBuf, binary.BigEndian, dataLen); err != nil {
@@ -192,13 +186,13 @@ func (s *segment) writeOne(msg *pb.Message) error {
 	size := atomic.AddUint32(&s.size, dataLen)
 	oldSize := size - dataLen
 	if (size/IndexInterval)-(oldSize/IndexInterval) > 0 || oldSize == 0 {
-		offset := uint32(msg.Id - s.minMsgid)
+		offset := uint32(msg.ID - s.minID)
 		if err := s.writeIndex(offset, oldSize); err != nil {
 			return err
 		}
 		atomic.AddUint32(&s.indexCount, 1)
 	}
-	atomic.AddUint64(&s.maxMsgid, 1)
+	atomic.AddUint64(&s.maxID, 1)
 	return nil
 }
 
@@ -206,7 +200,7 @@ func (s *segment) seek(msgid uint64) (pos uint32, err error) {
 	if len(s.indexs) == 0 {
 		return
 	}
-	offset := uint32(msgid - s.minMsgid)
+	offset := uint32(msgid - s.minID)
 	index := sort.Search(len(s.indexs), func(i int) bool {
 		return s.indexs[i].offset > offset
 	})
@@ -244,7 +238,7 @@ func (s *segment) readOne(msgid uint64, pos uint32) (msg *pb.Message, nextPos ui
 		} else if id == msgid {
 			nextPos = pos + len
 			data := s.logBuf[pos : pos+len : pos+len]
-			msg = &pb.Message{Id: id, Data: data}
+			msg = &pb.Message{ID: id, Data: data}
 			return
 		} else {
 			err = ErrNotFoundMsgid
@@ -253,7 +247,7 @@ func (s *segment) readOne(msgid uint64, pos uint32) (msg *pb.Message, nextPos ui
 	}
 }
 
-func (s *segment) exit() {
+func (s *segment) close() {
 	s.sync()
 	if s.indexFile != nil {
 		s.indexFile.Close()
@@ -301,4 +295,4 @@ type segments []*segment
 
 func (s segments) Len() int           { return len(s) }
 func (s segments) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
-func (s segments) Less(i, j int) bool { return s[i].minMsgid < s[j].minMsgid }
+func (s segments) Less(i, j int) bool { return s[i].minID < s[j].minID }
