@@ -65,7 +65,7 @@ func NewTopic(dataPath, topic string) (*Topic, error) {
 		timeout:       int64(10 * time.Second),
 		consumers:     make(map[string]Consumer),
 		filter:        filter.New(),
-		inFlightQueue: make([]*pb.Message, 100),
+		inFlightQueue: make([]*pb.Message, 0, 100),
 		inFlightMap:   make(map[uint64]*pb.Message),
 		writeC:        make(chan *pb.Message),
 		writeRspC:     make(chan error),
@@ -112,7 +112,9 @@ func (t *Topic) PutMessage(data []byte) error {
 }
 
 func (t *Topic) GetMessage() *pb.Message {
-	return <-t.readC
+	msg := <-t.readC
+	t.pushInFlight(msg)
+	return msg
 }
 
 func (t *Topic) Ack(msgID uint64) error {
@@ -168,9 +170,10 @@ func (t *Topic) createSegment(msgID uint64) (err error) {
 }
 
 func (t *Topic) writeOne(msg *pb.Message) error {
-	if t.filter.CheckOrAdd(msg.GetData()) {
-		return errors.New("already in bloomfilter.")
-	}
+	//if t.filter.CheckOrAdd(msg.GetData()) {
+	//	log.Debug(msg.ID, string(msg.GetData()), "filter")
+	//	return nil
+	//}
 	if t.curSeg.full() {
 		if err := t.createSegment(msg.ID); err != nil {
 			return err
@@ -180,7 +183,6 @@ func (t *Topic) writeOne(msg *pb.Message) error {
 		return err
 	}
 	atomic.AddUint64(&t.meta.WriteID, 1)
-	t.pushInFlight(msg)
 	log.Debugf("writeOne\tid=%d\tdata=%s", msg.ID, string(msg.Data))
 	return nil
 }
@@ -202,6 +204,7 @@ func (t *Topic) writeLoop() {
 		case msg := <-t.writeC:
 			count++
 			msg.ID = atomic.LoadUint64(&t.meta.WriteID)
+			msg.Timestamp = time.Now().UnixNano()
 			t.writeRspC <- t.writeOne(msg)
 		case <-syncTicker.C:
 			if count == 0 {
@@ -281,6 +284,7 @@ func (t *Topic) processInFlight() {
 		if err != nil {
 			return
 		}
+		log.Info("requeue", msg.GetID())
 		t.PutMessage(msg.GetData())
 	}
 }
@@ -301,6 +305,7 @@ func (t *Topic) popInFlight(now int64) (*pb.Message, error) {
 		return nil, errors.New("inFlightQueue is empty.")
 	}
 	msg := t.inFlightQueue[0]
+	log.Info("comp", now, msg.GetTimestamp()+t.timeout)
 	if now < msg.GetTimestamp()+t.timeout {
 		return nil, errors.New("no timeout message.")
 	}

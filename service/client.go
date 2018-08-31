@@ -8,12 +8,12 @@ const (
 	stateClosing
 )
 
-type Client struct {
-	State int32
-	Addr  string
+type client struct {
+	state int32
+	addr  string
 	topic *store.Topic
 }
 
-func (c *Client) String() string {
-	return c.Addr
+func (c *client) String() string {
+	return c.addr
 }

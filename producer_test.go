@@ -12,6 +12,7 @@ import (
 )
 
 func TestProducer(t *testing.T) {
+	log.Init("producer.log", log.INFO)
 	conn, err := grpc.Dial("127.0.0.1:9010", grpc.WithInsecure())
 	if err != nil {
 		log.Fatal(err)

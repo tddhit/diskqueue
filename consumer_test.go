@@ -12,15 +12,14 @@ import (
 )
 
 func TestConsumer(t *testing.T) {
+	log.Init("consumer.log", log.INFO)
 	conn, err := grpc.Dial("127.0.0.1:9010", grpc.WithInsecure())
 	if err != nil {
 		log.Fatal(err)
 	}
 	client := pb.NewDiskqueueClient(conn)
 	_, err = client.Subscribe(context.Background(), &pb.SubscribeRequest{
-		Topic:   "Test",
-		Channel: "TestConsumer",
-		MsgId:   0,
+		Topic: "Test",
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -45,8 +44,12 @@ func TestConsumer(t *testing.T) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		id := reply.GetMessage().GetId()
+		id := reply.GetMessage().GetID()
 		log.Info(id, string(reply.GetMessage().GetData()))
+		_, err = client.Ack(context.Background(), &pb.AckRequest{MsgID: id})
+		if err != nil {
+			log.Fatal(err)
+		}
 		if id == 199999 {
 			break
 		}

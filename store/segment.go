@@ -52,7 +52,7 @@ func newSegment(dataPath, name string, flag int,
 		minID: minID,
 		maxID: maxID,
 	}
-	fileName := fmt.Sprintf(path.Join(dataPath, "%s.diskqueue.%d.log"), name, minID)
+	fileName := fmt.Sprintf(path.Join(dataPath, "%s.diskqueue.%d.dat"), name, minID)
 	f, err := os.OpenFile(fileName, flag, 0600)
 	if err != nil {
 		return nil, err

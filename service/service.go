@@ -73,9 +73,10 @@ func (s *service) Subscribe(ctx context.Context,
 			"client already exists").Err()
 	} else {
 		topic := s.getTopic(in.GetTopic())
-		client := &Client{
-			Addr:  addr,
-			State: stateSubscribed,
+		client := &client{
+			addr:  addr,
+			state: stateSubscribed,
+			topic: topic,
 		}
 		if err := topic.AddConsumer(client); err != nil {
 			return nil, status.New(codes.AlreadyExists,
@@ -90,7 +91,7 @@ func (s *service) Cancel(ctx context.Context,
 	in *pb.CancelRequest) (*pb.CancelReply, error) {
 
 	reply, err := s.execute(ctx, in,
-		func(c *Client, in proto.Message) (interface{}, error) {
+		func(c *client, in proto.Message) (interface{}, error) {
 			c.topic.RemoveConsumer(c.String())
 			s.clients.Delete(c.String())
 			return &pb.CancelReply{}, nil
@@ -103,7 +104,7 @@ func (s *service) Pull(ctx context.Context,
 	in *pb.PullRequest) (*pb.PullReply, error) {
 
 	reply, err := s.execute(ctx, in,
-		func(c *Client, in proto.Message) (interface{}, error) {
+		func(c *client, in proto.Message) (interface{}, error) {
 			msg := c.topic.GetMessage()
 			return &pb.PullReply{
 				Message: msg,
@@ -117,7 +118,7 @@ func (s *service) KeepAlive(in *pb.KeepAliveRequest,
 	stream pb.Diskqueue_KeepAliveServer) error {
 
 	_, err := s.execute(stream.Context(), nil,
-		func(c *Client, in proto.Message) (interface{}, error) {
+		func(c *client, in proto.Message) (interface{}, error) {
 			ticker := time.NewTicker(time.Second)
 			for range ticker.C {
 				if err := stream.Send(&pb.KeepAliveReply{}); err != nil {
@@ -136,12 +137,12 @@ func (s *service) Ack(ctx context.Context,
 	in *pb.AckRequest) (*pb.AckReply, error) {
 
 	reply, err := s.execute(ctx, in,
-		func(c *Client, in proto.Message) (interface{}, error) {
+		func(c *client, in proto.Message) (interface{}, error) {
 			req := in.(*pb.AckRequest)
 			if err := c.topic.Ack(req.GetMsgID()); err != nil {
 				return nil, err
 			}
-			return &pb.CancelReply{}, nil
+			return &pb.AckReply{}, nil
 		},
 	)
 	return reply.(*pb.AckReply), err
@@ -166,14 +167,14 @@ func (s *service) getTopic(name string) *store.Topic {
 }
 
 func (s *service) execute(ctx context.Context, in proto.Message,
-	f func(*Client, proto.Message) (interface{}, error)) (interface{}, error) {
+	f func(*client, proto.Message) (interface{}, error)) (interface{}, error) {
 
 	p, _ := peer.FromContext(ctx)
 	addr := p.Addr.String()
 	c, ok := s.clients.Load(addr)
 	if ok {
-		client := c.(*Client)
-		if client.State == stateSubscribed {
+		client := c.(*client)
+		if client.state == stateSubscribed {
 			return f(client, in)
 		} else {
 			return nil, status.New(codes.FailedPrecondition,
