@@ -1,299 +1,108 @@
 package store
 
 import (
-	"bytes"
-	"encoding/binary"
-	"errors"
 	"fmt"
-	"os"
-	"path"
-	"sort"
 	"sync/atomic"
-	"syscall"
-	"unsafe"
 
+	"github.com/gogo/protobuf/proto"
 	"github.com/tddhit/tools/log"
+	"github.com/tddhit/tools/mmap"
 
 	pb "github.com/tddhit/diskqueue/pb"
 )
 
 const (
-	MaxSegmentSize = 1 << 29 // 512M
-	MaxMsgSize     = 1 << 22 // 4M
-	MaxMapSize     = 1 << 30 // 1G
-	IndexInterval  = 1 << 19 // 512K
+	maxSegmentSize = 1<<30 + 1<<13 // 1G + 8K
+	maxMsgSize     = 1 << 10       // 1k
 )
 
-var (
-	ErrEmptyIndexs   = errors.New("empty indexs")
-	ErrNotFoundIndex = errors.New("not found index")
-	ErrNotFoundMsgid = errors.New("not found msgid")
-)
-
-type segment struct {
-	minID      uint64
-	maxID      uint64
-	size       uint32
-	indexCount uint32
-
-	indexFile *os.File
-	logFile   *os.File
-	indexBuf  *[MaxMapSize]byte
-	logBuf    *[MaxMapSize]byte
-
-	writeBuf bytes.Buffer
-	indexs   indexs
+type smeta struct {
+	MinID    uint64 `json:"minID"`
+	ReadID   uint64 `json:"readID"`
+	WriteID  uint64 `json:"writeID"`
+	ReadPos  int64  `json:"readPos"`
+	WritePos int64  `json:"writePos"`
 }
 
-func newSegment(dataPath, name string, flag int,
-	minID, maxID uint64, meta ...uint32) (*segment, error) {
+type segment struct {
+	meta *smeta
+	file *mmap.MmapFile
+}
 
+func newSegment(path string, mode, advise int, m *smeta) (*segment, error) {
 	s := &segment{
-		minID: minID,
-		maxID: maxID,
+		meta: m,
 	}
-	fileName := fmt.Sprintf(path.Join(dataPath, "%s.diskqueue.%d.dat"), name, minID)
-	f, err := os.OpenFile(fileName, flag, 0600)
+	file, err := mmap.New(path, maxSegmentSize, mode, advise)
 	if err != nil {
-		return nil, err
+		log.Fatal(err)
 	}
-	s.logFile = f
-	fileName = fmt.Sprintf(path.Join(dataPath, "%s.diskqueue.%d.idx"),
-		name, minID)
-	f, err = os.OpenFile(fileName, flag, 0600)
-	if err != nil {
-		return nil, err
-	}
-	s.indexFile = f
-	if err := s.mmap(); err != nil {
-		return nil, err
-	}
-	if len(meta) == 2 {
-		s.size = meta[0]
-		s.indexCount = meta[1]
-	}
-	if err := s.loadIndex(); err != nil {
-		return nil, err
-	}
+	s.file = file
 	return s, nil
 }
 
-func (s *segment) mmap() error {
-	buf, err := syscall.Mmap(int(s.logFile.Fd()), 0, MaxMapSize, syscall.PROT_READ, syscall.MAP_SHARED)
-	if err != nil {
-		return err
-	}
-	if _, _, err := syscall.Syscall(syscall.SYS_MADVISE, uintptr(unsafe.Pointer(&buf[0])), uintptr(len(buf)), uintptr(syscall.MADV_RANDOM)); err != 0 {
-		return err
-	}
-	s.logBuf = (*[MaxMapSize]byte)(unsafe.Pointer(&buf[0]))
-
-	buf, err = syscall.Mmap(int(s.indexFile.Fd()), 0, MaxMapSize, syscall.PROT_READ, syscall.MAP_SHARED)
-	if err != nil {
-		return err
-	}
-	if _, _, err := syscall.Syscall(syscall.SYS_MADVISE, uintptr(unsafe.Pointer(&buf[0])), uintptr(len(buf)), uintptr(syscall.MADV_RANDOM)); err != 0 {
-		return err
-	}
-	s.indexBuf = (*[MaxMapSize]byte)(unsafe.Pointer(&buf[0]))
-	return nil
-}
-
-func (s *segment) loadIndex() error {
-	var (
-		offset uint32
-		pos    uint32
-	)
-	indexCount := atomic.LoadUint32(&s.indexCount)
-	i := 0
-	for indexCount != 0 {
-		buf := bytes.NewBuffer(s.indexBuf[i : i+4 : i+4])
-		err := binary.Read(buf, binary.BigEndian, &offset)
-		if err != nil {
-			return err
-		}
-		i += 4
-		buf = bytes.NewBuffer(s.indexBuf[i : i+4 : i+4])
-		err = binary.Read(buf, binary.BigEndian, &pos)
-		if err != nil {
-			return err
-		}
-		i += 4
-		s.indexs = append(s.indexs, &index{offset, pos})
-		log.Debug(offset, pos)
-		indexCount--
-	}
-	return nil
-}
-
 func (s *segment) full() bool {
-	size := atomic.LoadUint32(&s.size)
-	if size < MaxSegmentSize {
+	size := atomic.LoadInt64(&s.meta.WritePos)
+	if size < maxSegmentSize {
 		return false
 	}
 	return true
 }
 
-func (s *segment) writeLog(msg *pb.Message) error {
-	dataLen := uint32(len(msg.Data))
-	if dataLen > MaxMsgSize {
-		return fmt.Errorf("invalid message write size (%d) maxMsgSize=%d", dataLen, MaxMsgSize)
-	}
-	s.writeBuf.Reset()
-	if err := binary.Write(&s.writeBuf, binary.BigEndian, msg.ID); err != nil {
-		return err
-	}
-	if err := binary.Write(&s.writeBuf, binary.BigEndian, dataLen); err != nil {
-		return err
-	}
-	if _, err := s.writeBuf.Write(msg.Data); err != nil {
-		return err
-	}
-	//s.writeBuf.WriteString(strconv.FormatUint(msg.Id, 10))
-	//s.writeBuf.WriteString(",")
-	//s.writeBuf.Write(msg.Data)
-	//s.writeBuf.WriteString("\n")
-	//log.Debug(msg.Id, string(msg.Data))
-	if _, err := s.logFile.Write(s.writeBuf.Bytes()); err != nil {
-		s.logFile.Close()
-		s.logFile = nil
-		return err
-	}
-	return nil
-}
-
-func (s *segment) writeIndex(offset, pos uint32) error {
-	s.writeBuf.Reset()
-	if err := binary.Write(&s.writeBuf, binary.BigEndian, offset); err != nil {
-		return err
-	}
-	if err := binary.Write(&s.writeBuf, binary.BigEndian, pos); err != nil {
-		return err
-	}
-	if _, err := s.indexFile.Write(s.writeBuf.Bytes()); err != nil {
-		s.indexFile.Close()
-		s.indexFile = nil
-		return err
-	}
-	s.indexs = append(s.indexs, &index{offset, pos})
-	return nil
-}
-
 func (s *segment) writeOne(msg *pb.Message) error {
-	if err := s.writeLog(msg); err != nil {
+	buf, err := proto.Marshal(msg)
+	if err != nil {
+		log.Error(err)
 		return err
 	}
-	dataLen := 12 + uint32(len(msg.Data))
-	size := atomic.AddUint32(&s.size, dataLen)
-	oldSize := size - dataLen
-	if (size/IndexInterval)-(oldSize/IndexInterval) > 0 || oldSize == 0 {
-		offset := uint32(msg.ID - s.minID)
-		if err := s.writeIndex(offset, oldSize); err != nil {
-			return err
-		}
-		atomic.AddUint32(&s.indexCount, 1)
+	len := uint32(len(buf))
+	if len > maxMsgSize {
+		return fmt.Errorf("invalid msg:size(%d)>maxSize(%d)", len, maxMsgSize)
 	}
-	atomic.AddUint64(&s.maxID, 1)
+	offset := atomic.LoadInt64(&s.meta.WritePos)
+	if err := s.file.PutUint32At(offset, len); err != nil {
+		return err
+	}
+	offset += 4
+	if err := s.file.WriteAt(buf, offset); err != nil {
+		return err
+	}
+	offset += int64(len)
+	atomic.StoreInt64(&s.meta.WritePos, offset)
+	atomic.AddUint64(&s.meta.WriteID, 1)
 	return nil
 }
 
-func (s *segment) seek(msgid uint64) (pos uint32, err error) {
-	if len(s.indexs) == 0 {
-		return
+func (s *segment) readOne(msgID uint64) (*pb.Message, error) {
+	msg := &pb.Message{}
+	offset := s.meta.ReadPos
+	len := int64(s.file.Uint32At(offset))
+	offset += 4
+	buf := s.file.ReadAt(offset, len)
+	offset += len
+	if err := proto.Unmarshal(buf, msg); err != nil {
+		log.Error(err)
+		return nil, err
 	}
-	offset := uint32(msgid - s.minID)
-	index := sort.Search(len(s.indexs), func(i int) bool {
-		return s.indexs[i].offset > offset
-	})
-	if index == 0 {
-		err = ErrNotFoundIndex
-		return
+	if msg.GetID() != msgID {
+		return nil, fmt.Errorf("msg.GetID(%d) != msgID(%d)", msg.GetID(), msgID)
 	}
-	pos = s.indexs[index-1].pos
-	log.Debug("seg seek:", index-1, s.indexs[index-1].offset, s.indexs[index-1].pos)
-	return
-}
-
-func (s *segment) readOne(msgid uint64, pos uint32) (msg *pb.Message, nextPos uint32, err error) {
-	var (
-		id  uint64
-		len uint32
-	)
-	for {
-		buf := bytes.NewBuffer(s.logBuf[pos : pos+8 : pos+8])
-		err = binary.Read(buf, binary.BigEndian, &id)
-		if err != nil {
-			return
-		}
-		pos += 8
-		buf = bytes.NewBuffer(s.logBuf[pos : pos+4 : pos+4])
-		err = binary.Read(buf, binary.BigEndian, &len)
-		if err != nil {
-			return
-		}
-		pos += 4
-		log.Debugf("seg readOne\tid=%d\tlen=%d\tmsgid=%d\tpos=%d\n", id, len, msgid, pos)
-		if id < msgid {
-			pos += len
-			continue
-		} else if id == msgid {
-			nextPos = pos + len
-			data := s.logBuf[pos : pos+len : pos+len]
-			msg = &pb.Message{ID: id, Data: data}
-			return
-		} else {
-			err = ErrNotFoundMsgid
-			return
-		}
-	}
-}
-
-func (s *segment) close() {
-	s.sync()
-	if s.indexFile != nil {
-		s.indexFile.Close()
-		s.indexFile = nil
-	}
-
-	if s.logFile != nil {
-		s.logFile.Close()
-		s.logFile = nil
-	}
+	s.meta.ReadID++
+	s.meta.ReadPos = offset
+	log.Debugf("seg readOne\tid=%d", msg.GetID())
+	return msg, nil
 }
 
 func (s *segment) sync() error {
-	if s.indexFile != nil {
-		err := s.indexFile.Sync()
-		if err != nil {
-			s.indexFile.Close()
-			s.indexFile = nil
-			return err
-		}
-	}
-	if s.logFile != nil {
-		err := s.logFile.Sync()
-		if err != nil {
-			s.logFile.Close()
-			s.logFile = nil
-			return err
-		}
-	}
-	return nil
+	return s.file.Sync()
 }
 
-type index struct {
-	offset uint32
-	pos    uint32
+func (s *segment) close() error {
+	return s.file.Close()
 }
-
-type indexs []*index
-
-func (s indexs) Len() int           { return len(s) }
-func (s indexs) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
-func (s indexs) Less(i, j int) bool { return s[i].offset < s[j].offset }
 
 type segments []*segment
 
 func (s segments) Len() int           { return len(s) }
 func (s segments) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
-func (s segments) Less(i, j int) bool { return s[i].minID < s[j].minID }
+func (s segments) Less(i, j int) bool { return s[i].meta.MinID < s[j].meta.MinID }

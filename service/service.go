@@ -73,16 +73,12 @@ func (s *service) Subscribe(ctx context.Context,
 			"client already exists").Err()
 	} else {
 		topic := s.getTopic(in.GetTopic())
-		client := &client{
-			addr:  addr,
-			state: stateSubscribed,
-			topic: topic,
-		}
-		if err := topic.AddConsumer(client); err != nil {
+		c := newClient(addr, topic)
+		if err := topic.AddConsumer(c); err != nil {
 			return nil, status.New(codes.AlreadyExists,
 				"channel already subscribed").Err()
 		}
-		s.clients.Store(addr, client)
+		s.clients.Store(addr, c)
 		return &pb.SubscribeReply{}, nil
 	}
 }
@@ -105,12 +101,24 @@ func (s *service) Pull(ctx context.Context,
 
 	reply, err := s.execute(ctx, in,
 		func(c *client, in proto.Message) (interface{}, error) {
+			c.inFlightCond.L.Lock()
+			for !c.canPull() {
+				c.inFlightCond.Wait()
+			}
 			msg := c.topic.GetMessage()
-			return &pb.PullReply{
-				Message: msg,
-			}, nil
+			c.pushInFlight(msg)
+			c.inFlightCond.L.Unlock()
+			if msg != nil {
+				return &pb.PullReply{
+					Message: msg,
+				}, nil
+			}
+			return nil, status.Error(codes.Unavailable, "msg is nil")
 		},
 	)
+	if err != nil {
+		return nil, err
+	}
 	return reply.(*pb.PullReply), err
 }
 
@@ -139,12 +147,15 @@ func (s *service) Ack(ctx context.Context,
 	reply, err := s.execute(ctx, in,
 		func(c *client, in proto.Message) (interface{}, error) {
 			req := in.(*pb.AckRequest)
-			if err := c.topic.Ack(req.GetMsgID()); err != nil {
-				return nil, err
+			if err := c.removeFromInFlight(req.GetMsgID()); err != nil {
+				return nil, status.Error(codes.NotFound, err.Error())
 			}
 			return &pb.AckReply{}, nil
 		},
 	)
+	if err != nil {
+		return nil, err
+	}
 	return reply.(*pb.AckReply), err
 }
 
@@ -184,4 +195,12 @@ func (s *service) execute(ctx context.Context, in proto.Message,
 		return nil, status.New(codes.FailedPrecondition,
 			"client has not subscribed").Err()
 	}
+}
+
+func (s *service) Close() {
+	s.topics.Range(func(key, value interface{}) bool {
+		t := value.(*store.Topic)
+		t.Close()
+		return true
+	})
 }

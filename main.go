@@ -5,6 +5,9 @@ import (
 	"flag"
 	"net"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"google.golang.org/grpc"
 
@@ -40,5 +43,17 @@ func main() {
 	go func() {
 		http.ListenAndServe(":6060", expvar.Handler())
 	}()
-	s.Serve(lis)
+	go func() {
+		if err := s.Serve(lis); err != nil {
+			log.Error(err)
+		}
+	}()
+	signalC := make(chan os.Signal)
+	signal.Notify(signalC, syscall.SIGINT, syscall.SIGTERM)
+	select {
+	case sig := <-signalC:
+		log.Info(sig)
+		s.Stop()
+		service.Close()
+	}
 }

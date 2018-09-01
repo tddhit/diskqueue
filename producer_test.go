@@ -22,7 +22,7 @@ func TestProducer(t *testing.T) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	for i := 0; i < 100000; i++ {
+	for i := 0; i < 110; i++ {
 		_, err := client.Publish(context.Background(), &pb.PublishRequest{
 			Topic: "Test",
 			Data:  []byte("test_" + strconv.Itoa(i)),
@@ -31,7 +31,7 @@ func TestProducer(t *testing.T) {
 			log.Fatal(err)
 		}
 	}
-	for i := 10000; i < 20000; i++ {
+	for i := 10000; i < 10000; i++ {
 		for j := 0; j < 10; j++ {
 			err := streamClient.Send(&pb.PublishRequest{
 				Topic: "Test",

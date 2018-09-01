@@ -14,20 +14,15 @@ import (
 	"time"
 
 	"github.com/tddhit/tools/log"
+	"github.com/tddhit/tools/mmap"
 
-	"github.com/tddhit/diskqueue/filter"
 	pb "github.com/tddhit/diskqueue/pb"
 )
 
-type metadata struct {
-	WriteID  uint64 `json:"writeID"`
-	ReadID   uint64 `json:"readID"`
-	Segments []struct {
-		MinID      uint64 `json:"minID"`
-		MaxID      uint64 `json:"maxID"`
-		Size       uint32 `json:"size"`
-		IndexCount uint32 `json:"indexCount"`
-	} `json:"segments"`
+type tmeta struct {
+	WriteID  uint64   `json:"writeID"`
+	ReadID   uint64   `json:"readID"`
+	Segments []*smeta `json:"segments"`
 }
 
 type Consumer interface {
@@ -36,43 +31,42 @@ type Consumer interface {
 
 type Topic struct {
 	sync.RWMutex
-	name          string
-	dataPath      string
-	meta          metadata
-	timeout       int64
-	curSeg        *segment
-	segs          segments
-	consumers     map[string]Consumer
-	filter        *filter.Bloom
-	inFlightQueue []*pb.Message
-	inFlightMap   map[uint64]*pb.Message
-	inFlightMutex sync.Mutex
-	writeC        chan *pb.Message
-	writeRspC     chan error
-	syncEvery     int
-	syncInterval  time.Duration
-	needSync      bool
-	readC         chan *pb.Message
-	exitFlag      int32
-	exitC         chan struct{}
-	wg            sync.WaitGroup
+	name     string
+	dataPath string
+	meta     tmeta
+
+	curSeg    *segment
+	segs      segments
+	consumers map[string]Consumer
+
+	readC     chan *pb.Message
+	writeC    chan *pb.Message
+	writeRspC chan error
+
+	syncEvery    int
+	syncInterval time.Duration
+	needSync     bool
+
+	exitFlag int32
+	exitC    chan struct{}
+	wg       sync.WaitGroup
 }
 
 func NewTopic(dataPath, topic string) (*Topic, error) {
 	t := &Topic{
-		name:          topic,
-		dataPath:      dataPath,
-		timeout:       int64(10 * time.Second),
-		consumers:     make(map[string]Consumer),
-		filter:        filter.New(),
-		inFlightQueue: make([]*pb.Message, 0, 100),
-		inFlightMap:   make(map[uint64]*pb.Message),
-		writeC:        make(chan *pb.Message),
-		writeRspC:     make(chan error),
-		syncEvery:     10000,
-		syncInterval:  30 * time.Second,
-		readC:         make(chan *pb.Message),
-		exitC:         make(chan struct{}),
+		name:     topic,
+		dataPath: dataPath,
+
+		consumers: make(map[string]Consumer),
+
+		readC:     make(chan *pb.Message),
+		writeC:    make(chan *pb.Message),
+		writeRspC: make(chan error),
+
+		syncEvery:    10000,
+		syncInterval: 10 * time.Second,
+
+		exitC: make(chan struct{}),
 	}
 	if err := t.loadMetadata(); err != nil {
 		if !os.IsNotExist(err) {
@@ -80,21 +74,20 @@ func NewTopic(dataPath, topic string) (*Topic, error) {
 		}
 	}
 	if len(t.segs) == 0 {
-		if err := t.createSegment(0); err != nil {
+		meta := &smeta{}
+		if err := t.createSegment(mmap.APPEND, meta); err != nil {
 			return nil, err
 		}
+		t.meta.Segments = append(t.meta.Segments, meta)
 	}
-	t.wg.Add(3)
+	t.wg.Add(1)
 	go func() {
 		t.writeLoop()
 		t.wg.Done()
 	}()
+	t.wg.Add(1)
 	go func() {
 		t.readLoop()
-		t.wg.Done()
-	}()
-	go func() {
-		t.scanInFlightLoop()
 		t.wg.Done()
 	}()
 	return t, nil
@@ -112,23 +105,17 @@ func (t *Topic) PutMessage(data []byte) error {
 }
 
 func (t *Topic) GetMessage() *pb.Message {
-	msg := <-t.readC
-	t.pushInFlight(msg)
-	return msg
+	return <-t.readC
 }
 
-func (t *Topic) Ack(msgID uint64) error {
-	return t.removeFromInFlight(msgID)
-}
-
-func (t *Topic) AddConsumer(consumer Consumer) error {
+func (t *Topic) AddConsumer(c Consumer) error {
 	t.Lock()
 	defer t.Unlock()
 
-	if _, ok := t.consumers[consumer.String()]; ok {
+	if _, ok := t.consumers[c.String()]; ok {
 		return errors.New("already subscribe.")
 	} else {
-		t.consumers[consumer.String()] = consumer
+		t.consumers[c.String()] = c
 	}
 	return nil
 }
@@ -140,50 +127,44 @@ func (t *Topic) RemoveConsumer(name string) {
 	delete(t.consumers, name)
 }
 
-func (t *Topic) seek(msgID uint64) (seg *segment, pos uint32, err error) {
+func (t *Topic) seek(msgID uint64) (*segment, error) {
 	if len(t.segs) == 0 {
-		err = errors.New("empty segments")
-		return
+		return nil, errors.New("empty segments")
 	}
 	index := sort.Search(len(t.segs), func(i int) bool {
-		return t.segs[i].minID > msgID
+		return t.segs[i].meta.MinID > msgID
 	})
 	if index == 0 {
-		err = errors.New("not found segment")
-		return
+		return nil, errors.New("not found segment")
 	}
-	seg = t.segs[index-1]
-	pos, err = seg.seek(msgID)
-	log.Debugf("Seek\tmsgID=%d\tseg=%d\tpos=%d\n", msgID, seg.minID, pos)
-	return
+	return t.segs[index-1], nil
 }
 
-func (t *Topic) createSegment(msgID uint64) (err error) {
-	seg, err := newSegment(t.dataPath, t.name,
-		os.O_CREATE|os.O_RDWR|os.O_APPEND, msgID, msgID)
+func (t *Topic) createSegment(mode int, meta *smeta) error {
+	file := fmt.Sprintf(path.Join(t.dataPath, "%s.diskqueue.%d.dat"),
+		t.name, meta.MinID)
+	seg, err := newSegment(file, mode, mmap.SEQUENTIAL, meta)
 	if err != nil {
-		return
+		return err
 	}
 	t.segs = append(t.segs, seg)
 	t.curSeg = seg
-	return
+	return nil
 }
 
 func (t *Topic) writeOne(msg *pb.Message) error {
-	//if t.filter.CheckOrAdd(msg.GetData()) {
-	//	log.Debug(msg.ID, string(msg.GetData()), "filter")
-	//	return nil
-	//}
 	if t.curSeg.full() {
-		if err := t.createSegment(msg.ID); err != nil {
+		meta := &smeta{MinID: msg.ID}
+		if err := t.createSegment(mmap.APPEND, meta); err != nil {
 			return err
 		}
+		t.meta.Segments = append(t.meta.Segments, meta)
 	}
 	if err := t.curSeg.writeOne(msg); err != nil {
 		return err
 	}
 	atomic.AddUint64(&t.meta.WriteID, 1)
-	log.Debugf("writeOne\tid=%d\tdata=%s", msg.ID, string(msg.Data))
+	log.Debugf("writeOne\tid=%d\tdata=%s", msg.ID, string(msg.GetData()))
 	return nil
 }
 
@@ -204,12 +185,8 @@ func (t *Topic) writeLoop() {
 		case msg := <-t.writeC:
 			count++
 			msg.ID = atomic.LoadUint64(&t.meta.WriteID)
-			msg.Timestamp = time.Now().UnixNano()
 			t.writeRspC <- t.writeOne(msg)
 		case <-syncTicker.C:
-			if count == 0 {
-				continue
-			}
 			t.needSync = true
 		case <-t.exitC:
 			goto exit
@@ -223,23 +200,21 @@ func (t *Topic) readLoop() {
 	var (
 		msg *pb.Message
 		seg *segment
-		pos uint32
 		err error
 	)
 	for {
 		if atomic.LoadInt32(&t.exitFlag) == 1 {
 			goto exit
 		}
-		readID := atomic.LoadUint64(&t.meta.ReadID)
 		if seg == nil {
-			seg, pos, err = t.seek(readID)
+			seg, err = t.seek(t.meta.ReadID)
 			if err != nil {
 				log.Fatal(err)
 			}
 		}
-		if readID < atomic.LoadUint64(&t.meta.WriteID) {
-			if readID < atomic.LoadUint64(&seg.maxID) {
-				msg, pos, err = seg.readOne(readID, pos)
+		if t.meta.ReadID < atomic.LoadUint64(&t.meta.WriteID) {
+			if t.meta.ReadID < atomic.LoadUint64(&seg.meta.WriteID) {
+				msg, err = seg.readOne(t.meta.ReadID)
 				if err != nil {
 					log.Fatal(err)
 				}
@@ -253,7 +228,7 @@ func (t *Topic) readLoop() {
 		}
 		select {
 		case t.readC <- msg:
-			atomic.AddUint64(&t.meta.ReadID, 1)
+			t.meta.ReadID++
 		case <-t.exitC:
 			goto exit
 		}
@@ -261,65 +236,6 @@ func (t *Topic) readLoop() {
 exit:
 	close(t.readC)
 	log.Infof("topic(%s) exit readLoop.", t.name)
-}
-
-func (t *Topic) scanInFlightLoop() {
-	ticker := time.NewTicker(time.Second)
-	for {
-		select {
-		case <-ticker.C:
-			t.processInFlight()
-		case <-t.exitC:
-			goto exit
-		}
-	}
-exit:
-	ticker.Stop()
-}
-
-func (t *Topic) processInFlight() {
-	now := time.Now().UnixNano()
-	for {
-		msg, err := t.popInFlight(now)
-		if err != nil {
-			return
-		}
-		log.Info("requeue", msg.GetID())
-		t.PutMessage(msg.GetData())
-	}
-}
-
-func (t *Topic) pushInFlight(msg *pb.Message) {
-	t.inFlightMutex.Lock()
-	defer t.inFlightMutex.Unlock()
-
-	t.inFlightQueue = append(t.inFlightQueue, msg)
-	t.inFlightMap[msg.GetID()] = msg
-}
-
-func (t *Topic) popInFlight(now int64) (*pb.Message, error) {
-	t.inFlightMutex.Lock()
-	defer t.inFlightMutex.Unlock()
-
-	if len(t.inFlightQueue) == 0 {
-		return nil, errors.New("inFlightQueue is empty.")
-	}
-	msg := t.inFlightQueue[0]
-	log.Info("comp", now, msg.GetTimestamp()+t.timeout)
-	if now < msg.GetTimestamp()+t.timeout {
-		return nil, errors.New("no timeout message.")
-	}
-	t.inFlightQueue = t.inFlightQueue[1:]
-	delete(t.inFlightMap, msg.GetID())
-	return msg, nil
-}
-
-func (t *Topic) removeFromInFlight(msgID uint64) error {
-	t.inFlightMutex.Lock()
-	defer t.inFlightMutex.Unlock()
-
-	delete(t.inFlightMap, msgID)
-	return nil
 }
 
 func (t *Topic) persistMetadata() error {
@@ -345,37 +261,24 @@ func (t *Topic) loadMetadata() error {
 		return err
 	}
 	decoder := json.NewDecoder(f)
-	if err := decoder.Decode(t.meta); err != nil {
+	if err := decoder.Decode(&t.meta); err != nil {
 		return err
 	}
-	var flag int
-	for i, segment := range t.meta.Segments {
+	var mode int
+	for i, meta := range t.meta.Segments {
 		if i != len(t.meta.Segments)-1 {
-			flag = os.O_RDONLY
+			mode = mmap.RDONLY
 		} else {
-			flag = os.O_CREATE | os.O_RDWR | os.O_APPEND
+			mode = mmap.APPEND
 		}
-		seg, err := newSegment(t.dataPath, t.name, flag,
-			segment.MinID, segment.MaxID, segment.Size, segment.IndexCount)
-		if err != nil {
+		if err := t.createSegment(mode, meta); err != nil {
 			return err
 		}
-		t.segs = append(t.segs, seg)
-	}
-	if len(t.segs) > 0 {
-		t.curSeg = t.segs[len(t.segs)-1]
 	}
 	return nil
 }
 
 func (t *Topic) Close() error {
-	if err := t.exit(); err != nil {
-		return err
-	}
-	return t.sync()
-}
-
-func (t *Topic) exit() error {
 	t.Lock()
 	defer t.Unlock()
 
@@ -384,6 +287,9 @@ func (t *Topic) exit() error {
 	}
 	close(t.exitC)
 	t.wg.Wait()
+	if err := t.sync(); err != nil {
+		return err
+	}
 	for _, seg := range t.segs {
 		seg.close()
 	}
