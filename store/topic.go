@@ -154,7 +154,11 @@ func (t *Topic) createSegment(mode int, meta *smeta) error {
 
 func (t *Topic) writeOne(msg *pb.Message) error {
 	if t.curSeg.full() {
-		meta := &smeta{MinID: msg.ID}
+		meta := &smeta{
+			MinID:   msg.ID,
+			ReadID:  msg.ID,
+			WriteID: msg.ID,
+		}
 		if err := t.createSegment(mmap.APPEND, meta); err != nil {
 			return err
 		}
@@ -249,6 +253,7 @@ func (t *Topic) persistMetadata() error {
 		return err
 	}
 	encoder := json.NewEncoder(f)
+	encoder.SetIndent("", "    ")
 	if err := encoder.Encode(t.meta); err != nil {
 		return err
 	}

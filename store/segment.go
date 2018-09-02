@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	maxSegmentSize = 1<<30 + 1<<13 // 1G + 8K
-	maxMsgSize     = 1 << 10       // 1k
+	maxSegmentSize = 1 << 25 // 1G
+	maxMsgSize     = 1 << 10 // 1k
 )
 
 type smeta struct {
@@ -33,7 +33,7 @@ func newSegment(path string, mode, advise int, m *smeta) (*segment, error) {
 	s := &segment{
 		meta: m,
 	}
-	file, err := mmap.New(path, maxSegmentSize, mode, advise)
+	file, err := mmap.New(path, maxSegmentSize+2*maxMsgSize, mode, advise)
 	if err != nil {
 		log.Fatal(err)
 	}
