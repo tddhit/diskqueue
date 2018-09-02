@@ -52,6 +52,7 @@ func (s *Service) MPublish(stream pb.Diskqueue_MPublishServer) error {
 			return stream.SendAndClose(&pb.PublishReply{})
 		}
 		if err != nil {
+			log.Error(err)
 			return err
 		}
 		topic := s.getTopic(in.GetTopic())
@@ -120,6 +121,7 @@ func (s *Service) KeepAlive(in *pb.KeepAliveRequest,
 	ticker := time.NewTicker(time.Second)
 	for range ticker.C {
 		if err := stream.Send(&pb.KeepAliveReply{}); err != nil {
+			log.Error(err)
 			cc.topic.RemoveConsumer(cc.String())
 			s.clients.Delete(cc.String())
 			return err

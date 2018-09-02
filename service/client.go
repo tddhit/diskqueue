@@ -100,13 +100,13 @@ func (c *client) popInFlight(now int64) (*pb.Message, error) {
 		return nil, errors.New("inFlightQueue is empty.")
 	}
 	msg := heap.Pop(c.inFlightQueue).(*pb.Message)
-	log.Info("comp", now, msg.GetTimestamp()+c.inFlightTimeout)
+	log.Debug("comp", now, msg.GetTimestamp()+c.inFlightTimeout)
 	if now < msg.GetTimestamp()+c.inFlightTimeout {
 		heap.Push(c.inFlightQueue, msg)
 		return nil, errors.New("no timeout message.")
 	}
 	if _, ok := c.inFlightMap[msg.GetID()]; ok {
-		log.Info("delete", msg.GetID())
+		log.Debug("delete", msg.GetID())
 		delete(c.inFlightMap, msg.GetID())
 		c.inFlightCond.Signal()
 		return msg, nil
