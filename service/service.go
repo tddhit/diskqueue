@@ -10,14 +10,13 @@ import (
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
 
-	"github.com/gogo/protobuf/proto"
 	pb "github.com/tddhit/diskqueue/pb"
 	"github.com/tddhit/diskqueue/store"
 	"github.com/tddhit/tools/dirlock"
 	"github.com/tddhit/tools/log"
 )
 
-type service struct {
+type Service struct {
 	sync.Mutex
 	topics   sync.Map
 	clients  sync.Map
@@ -25,8 +24,8 @@ type service struct {
 	dl       *dirlock.DirLock
 }
 
-func New(dataPath string) *service {
-	s := &service{
+func New(dataPath string) *Service {
+	s := &Service{
 		dataPath: dataPath,
 		dl:       dirlock.New(dataPath),
 	}
@@ -36,7 +35,7 @@ func New(dataPath string) *service {
 	return s
 }
 
-func (s *service) Publish(ctx context.Context,
+func (s *Service) Publish(ctx context.Context,
 	in *pb.PublishRequest) (*pb.PublishReply, error) {
 
 	topic := s.getTopic(in.GetTopic())
@@ -46,7 +45,7 @@ func (s *service) Publish(ctx context.Context,
 	return &pb.PublishReply{}, nil
 }
 
-func (s *service) MPublish(stream pb.Diskqueue_MPublishServer) error {
+func (s *Service) MPublish(stream pb.Diskqueue_MPublishServer) error {
 	for {
 		in, err := stream.Recv()
 		if err == io.EOF {
@@ -62,7 +61,7 @@ func (s *service) MPublish(stream pb.Diskqueue_MPublishServer) error {
 	}
 }
 
-func (s *service) Subscribe(ctx context.Context,
+func (s *Service) Subscribe(ctx context.Context,
 	in *pb.SubscribeRequest) (*pb.SubscribeReply, error) {
 
 	p, _ := peer.FromContext(ctx)
@@ -83,83 +82,63 @@ func (s *service) Subscribe(ctx context.Context,
 	}
 }
 
-func (s *service) Cancel(ctx context.Context,
+func (s *Service) Cancel(ctx context.Context,
 	in *pb.CancelRequest) (*pb.CancelReply, error) {
 
-	reply, err := s.execute(ctx, in,
-		func(c *client, in proto.Message) (interface{}, error) {
-			c.topic.RemoveConsumer(c.String())
-			s.clients.Delete(c.String())
-			return &pb.CancelReply{}, nil
-		},
-	)
-	return reply.(*pb.CancelReply), err
+	c := ctx.Value("client").(*client)
+	c.topic.RemoveConsumer(c.String())
+	s.clients.Delete(c.String())
+	return &pb.CancelReply{}, nil
 }
 
-func (s *service) Pull(ctx context.Context,
+func (s *Service) Pull(ctx context.Context,
 	in *pb.PullRequest) (*pb.PullReply, error) {
 
-	reply, err := s.execute(ctx, in,
-		func(c *client, in proto.Message) (interface{}, error) {
-			c.inFlightCond.L.Lock()
-			for !c.canPull() {
-				c.inFlightCond.Wait()
-			}
-			msg := c.topic.GetMessage()
-			c.pushInFlight(msg)
-			c.inFlightCond.L.Unlock()
-			if msg != nil {
-				return &pb.PullReply{
-					Message: msg,
-				}, nil
-			}
-			return nil, status.Error(codes.Unavailable, "msg is nil")
-		},
-	)
-	if err != nil {
-		return nil, err
+	c := ctx.Value("client").(*client)
+	c.inFlightCond.L.Lock()
+	for !c.canPull() {
+		c.inFlightCond.Wait()
 	}
-	return reply.(*pb.PullReply), err
+	msg := c.topic.GetMessage()
+	c.pushInFlight(msg)
+	c.inFlightCond.L.Unlock()
+	if msg != nil {
+		return &pb.PullReply{
+			Message: msg,
+		}, nil
+	}
+	return nil, status.Error(codes.Unavailable, "msg is nil")
 }
 
-func (s *service) KeepAlive(in *pb.KeepAliveRequest,
+func (s *Service) KeepAlive(in *pb.KeepAliveRequest,
 	stream pb.Diskqueue_KeepAliveServer) error {
 
-	_, err := s.execute(stream.Context(), nil,
-		func(c *client, in proto.Message) (interface{}, error) {
-			ticker := time.NewTicker(time.Second)
-			for range ticker.C {
-				if err := stream.Send(&pb.KeepAliveReply{}); err != nil {
-					c.topic.RemoveConsumer(c.String())
-					s.clients.Delete(c.String())
-					return nil, err
-				}
-			}
-			return nil, nil
-		},
-	)
-	return err
+	p, _ := peer.FromContext(stream.Context())
+	addr := p.Addr.String()
+	c, _ := s.clients.Load(addr)
+	cc := c.(*client)
+	ticker := time.NewTicker(time.Second)
+	for range ticker.C {
+		if err := stream.Send(&pb.KeepAliveReply{}); err != nil {
+			cc.topic.RemoveConsumer(cc.String())
+			s.clients.Delete(cc.String())
+			return err
+		}
+	}
+	return nil
 }
 
-func (s *service) Ack(ctx context.Context,
+func (s *Service) Ack(ctx context.Context,
 	in *pb.AckRequest) (*pb.AckReply, error) {
 
-	reply, err := s.execute(ctx, in,
-		func(c *client, in proto.Message) (interface{}, error) {
-			req := in.(*pb.AckRequest)
-			if err := c.removeFromInFlight(req.GetMsgID()); err != nil {
-				return nil, status.Error(codes.NotFound, err.Error())
-			}
-			return &pb.AckReply{}, nil
-		},
-	)
-	if err != nil {
-		return nil, err
+	c := ctx.Value("client").(*client)
+	if err := c.removeFromInFlight(in.GetMsgID()); err != nil {
+		return nil, status.Error(codes.NotFound, err.Error())
 	}
-	return reply.(*pb.AckReply), err
+	return &pb.AckReply{}, nil
 }
 
-func (s *service) getTopic(name string) *store.Topic {
+func (s *Service) getTopic(name string) *store.Topic {
 	if t, ok := s.topics.Load(name); ok {
 		return t.(*store.Topic)
 	}
@@ -177,27 +156,7 @@ func (s *service) getTopic(name string) *store.Topic {
 	return topic
 }
 
-func (s *service) execute(ctx context.Context, in proto.Message,
-	f func(*client, proto.Message) (interface{}, error)) (interface{}, error) {
-
-	p, _ := peer.FromContext(ctx)
-	addr := p.Addr.String()
-	c, ok := s.clients.Load(addr)
-	if ok {
-		client := c.(*client)
-		if client.state == stateSubscribed {
-			return f(client, in)
-		} else {
-			return nil, status.New(codes.FailedPrecondition,
-				"client state is not stateSubscribed").Err()
-		}
-	} else {
-		return nil, status.New(codes.FailedPrecondition,
-			"client has not subscribed").Err()
-	}
-}
-
-func (s *service) Close() {
+func (s *Service) Close() {
 	s.topics.Range(func(key, value interface{}) bool {
 		t := value.(*store.Topic)
 		t.Close()

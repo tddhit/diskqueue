@@ -200,6 +200,7 @@ func (t *Topic) readLoop() {
 	var (
 		msg *pb.Message
 		seg *segment
+		pos int64
 		err error
 	)
 	for {
@@ -214,7 +215,7 @@ func (t *Topic) readLoop() {
 		}
 		if t.meta.ReadID < atomic.LoadUint64(&t.meta.WriteID) {
 			if t.meta.ReadID < atomic.LoadUint64(&seg.meta.WriteID) {
-				msg, err = seg.readOne(t.meta.ReadID)
+				msg, pos, err = seg.readOne(t.meta.ReadID)
 				if err != nil {
 					log.Fatal(err)
 				}
@@ -229,6 +230,8 @@ func (t *Topic) readLoop() {
 		select {
 		case t.readC <- msg:
 			t.meta.ReadID++
+			seg.meta.ReadID++
+			seg.meta.ReadPos = pos
 		case <-t.exitC:
 			goto exit
 		}

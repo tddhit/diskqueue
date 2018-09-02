@@ -73,7 +73,7 @@ func (s *segment) writeOne(msg *pb.Message) error {
 	return nil
 }
 
-func (s *segment) readOne(msgID uint64) (*pb.Message, error) {
+func (s *segment) readOne(msgID uint64) (*pb.Message, int64, error) {
 	msg := &pb.Message{}
 	offset := s.meta.ReadPos
 	len := int64(s.file.Uint32At(offset))
@@ -82,15 +82,13 @@ func (s *segment) readOne(msgID uint64) (*pb.Message, error) {
 	offset += len
 	if err := proto.Unmarshal(buf, msg); err != nil {
 		log.Error(err)
-		return nil, err
+		return nil, 0, err
 	}
 	if msg.GetID() != msgID {
-		return nil, fmt.Errorf("msg.GetID(%d) != msgID(%d)", msg.GetID(), msgID)
+		return nil, 0, fmt.Errorf("msg.GetID(%d) != msgID(%d)", msg.GetID(), msgID)
 	}
-	s.meta.ReadID++
-	s.meta.ReadPos = offset
 	log.Debugf("seg readOne\tid=%d", msg.GetID())
-	return msg, nil
+	return msg, offset, nil
 }
 
 func (s *segment) sync() error {
