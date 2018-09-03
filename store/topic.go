@@ -31,7 +31,7 @@ type Consumer interface {
 
 type Topic struct {
 	sync.RWMutex
-	name     string
+	Name     string
 	dataPath string
 	meta     tmeta
 
@@ -54,7 +54,7 @@ type Topic struct {
 
 func NewTopic(dataPath, topic string) (*Topic, error) {
 	t := &Topic{
-		name:     topic,
+		Name:     topic,
 		dataPath: dataPath,
 
 		consumers: make(map[string]Consumer),
@@ -142,7 +142,7 @@ func (t *Topic) seek(msgID uint64) (*segment, error) {
 
 func (t *Topic) createSegment(mode int, meta *smeta) error {
 	file := fmt.Sprintf(path.Join(t.dataPath, "%s.diskqueue.%d.dat"),
-		t.name, meta.MinID)
+		t.Name, meta.MinID)
 	seg, err := newSegment(file, mode, mmap.SEQUENTIAL, meta)
 	if err != nil {
 		return err
@@ -197,7 +197,7 @@ func (t *Topic) writeLoop() {
 		}
 	}
 exit:
-	log.Infof("diskqueue(%s) exit writeLoop.", t.name)
+	log.Infof("diskqueue(%s) exit writeLoop.", t.Name)
 }
 
 func (t *Topic) readLoop() {
@@ -242,11 +242,11 @@ func (t *Topic) readLoop() {
 	}
 exit:
 	close(t.readC)
-	log.Infof("topic(%s) exit readLoop.", t.name)
+	log.Infof("topic(%s) exit readLoop.", t.Name)
 }
 
 func (t *Topic) persistMetadata() error {
-	filename := fmt.Sprintf(path.Join(t.dataPath, "%s.diskqueue.meta"), t.name)
+	filename := fmt.Sprintf(path.Join(t.dataPath, "%s.diskqueue.meta"), t.Name)
 	tmpFilename := fmt.Sprintf("%s.%d.tmp", filename, rand.Int())
 	f, err := os.OpenFile(tmpFilename, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
 	if err != nil {
@@ -263,7 +263,7 @@ func (t *Topic) persistMetadata() error {
 }
 
 func (t *Topic) loadMetadata() error {
-	filename := fmt.Sprintf(path.Join(t.dataPath, "%s.diskqueue.meta"), t.name)
+	filename := fmt.Sprintf(path.Join(t.dataPath, "%s.diskqueue.meta"), t.Name)
 	f, err := os.Open(filename)
 	if err != nil {
 		return err

@@ -42,7 +42,6 @@ func main() {
 			tracing.ServerMiddleware,
 			metrics.Middleware,
 		),
-		tropt.WithStreamServerMiddleware(service.CheckPeerWithStream(svc)),
 		tropt.WithBeforeClose(svc.Close),
 	)
 	if err != nil {

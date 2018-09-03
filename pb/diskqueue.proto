@@ -5,10 +5,7 @@ package diskqueue;
 service Diskqueue {
     rpc Publish     (PublishRequest)         returns (PublishReply)             {}
     rpc MPublish    (stream PublishRequest)  returns (PublishReply)             {}
-    rpc Subscribe   (SubscribeRequest)       returns (SubscribeReply)           {}
-    rpc Cancel      (CancelRequest)          returns (CancelReply)              {}
     rpc Pull        (PullRequest)            returns (PullReply)                {}
-    rpc KeepAlive   (KeepAliveRequest)       returns (stream KeepAliveReply)    {}
     rpc Ack         (AckRequest)             returns (AckReply)                 {}
 }
 
@@ -26,34 +23,17 @@ message PublishRequest {
 message PublishReply {
 }
 
-message SubscribeRequest {
-    string topic    = 1;
-}
-
-message SubscribeReply {
-}
-
-message CancelRequest {
-}
-
-message CancelReply {
-}
-
 message PullRequest {
+    string topic = 1;
 }
 
 message PullReply {
     Message message = 1;
 }
 
-message KeepAliveRequest {
-}
-
-message KeepAliveReply {
-}
-
 message AckRequest {
-    uint64 msgID = 1;
+    string topic = 1;
+    uint64 msgID = 2;
 }
 
 message AckReply {
