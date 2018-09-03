@@ -25,6 +25,7 @@ message PublishReply {
 
 message PullRequest {
     string topic = 1;
+    bool   ack = 2;
 }
 
 message PullReply {

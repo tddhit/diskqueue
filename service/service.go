@@ -66,15 +66,20 @@ func (s *Service) Pull(ctx context.Context,
 	in *pb.PullRequest) (*pb.PullReply, error) {
 
 	topic := s.getOrCreateTopic(in.GetTopic())
-	client := ctx.Value("client").(*client)
-	inflight := client.getOrCreateInflight(topic)
-	inflight.cond.L.Lock()
-	for inflight.full() {
-		inflight.cond.Wait()
+	var msg *pb.Message
+	if in.GetAck() {
+		client := ctx.Value("client").(*client)
+		inflight := client.getOrCreateInflight(topic)
+		inflight.cond.L.Lock()
+		for inflight.full() {
+			inflight.cond.Wait()
+		}
+		msg = topic.GetMessage()
+		inflight.push(msg)
+		inflight.cond.L.Unlock()
+	} else {
+		msg = topic.GetMessage()
 	}
-	msg := topic.GetMessage()
-	inflight.push(msg)
-	inflight.cond.L.Unlock()
 	if msg != nil {
 		return &pb.PullReply{
 			Message: msg,
