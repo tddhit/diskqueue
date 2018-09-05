@@ -5,30 +5,44 @@ import (
 	"io"
 	"sync"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/tddhit/tools/dirlock"
+	"github.com/tddhit/tools/log"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	pb "github.com/tddhit/diskqueue/pb"
 	"github.com/tddhit/diskqueue/store"
-	"github.com/tddhit/tools/dirlock"
-	"github.com/tddhit/tools/log"
 )
 
 type Service struct {
 	sync.RWMutex
 	topics   map[string]*store.Topic
 	clients  map[string]*client
+	filters  map[string]*filter
 	dataPath string
 	dl       *dirlock.DirLock
+
+	filterCounter *prometheus.CounterVec
 }
 
 func New(dataPath string) *Service {
 	s := &Service{
 		topics:   make(map[string]*store.Topic),
+		filters:  make(map[string]*filter),
 		clients:  make(map[string]*client),
 		dataPath: dataPath,
 		dl:       dirlock.New(dataPath),
+
+		filterCounter: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "filter_count",
+				Help: "filter by bloom",
+			},
+			[]string{},
+		),
 	}
+	prometheus.MustRegister(s.filterCounter)
 	if err := s.dl.Lock(); err != nil {
 		log.Fatal(err)
 	}
@@ -39,8 +53,23 @@ func (s *Service) Publish(ctx context.Context,
 	in *pb.PublishRequest) (*pb.PublishReply, error) {
 
 	topic := s.getOrCreateTopic(in.GetTopic())
+	filter := s.getOrCreateFilter(in.GetTopic())
+	if !in.GetIgnoreFilter() {
+		key := in.GetData()
+		if in.GetHashKey() != nil {
+			key = in.GetHashKey()
+		}
+		if filter.mayContain(key) {
+			s.filterCounter.WithLabelValues().Inc()
+			return nil, status.Error(codes.AlreadyExists, "filter by bloom")
+		} else {
+			if err := filter.add(key); err != nil {
+				return nil, status.Error(codes.Internal, err.Error())
+			}
+		}
+	}
 	if err := topic.PutMessage(in.GetData()); err != nil {
-		return nil, status.New(codes.Aborted, err.Error()).Err()
+		return nil, status.Error(codes.Aborted, err.Error())
 	}
 	return &pb.PublishReply{}, nil
 }
@@ -57,7 +86,7 @@ func (s *Service) MPublish(stream pb.Diskqueue_MPublishServer) error {
 		}
 		topic := s.getOrCreateTopic(in.GetTopic())
 		if err := topic.PutMessage(in.GetData()); err != nil {
-			return status.New(codes.Aborted, err.Error()).Err()
+			return status.Error(codes.Aborted, err.Error())
 		}
 	}
 }
@@ -67,7 +96,7 @@ func (s *Service) Pull(ctx context.Context,
 
 	topic := s.getOrCreateTopic(in.GetTopic())
 	var msg *pb.Message
-	if in.GetAck() {
+	if in.GetNeedAck() {
 		client := ctx.Value("client").(*client)
 		inflight := client.getOrCreateInflight(topic)
 		inflight.cond.L.Lock()
@@ -92,6 +121,7 @@ func (s *Service) Ack(ctx context.Context,
 	in *pb.AckRequest) (*pb.AckReply, error) {
 
 	client := ctx.Value("client").(*client)
+	log.Info(s.topics, ",", in.GetTopic(), ",")
 	topic, exist := s.getTopic(in.GetTopic())
 	if !exist {
 		return nil, status.Error(codes.FailedPrecondition,
@@ -166,6 +196,36 @@ func (s *Service) getOrCreateClient(addr string) *client {
 	s.clients[addr] = client
 	s.Unlock()
 	return client
+}
+
+func (s *Service) getFilter(topic string) (*filter, bool) {
+	s.RLock()
+	defer s.RUnlock()
+
+	f, ok := s.filters[topic]
+	return f, ok
+}
+
+func (s *Service) getOrCreateFilter(topic string) *filter {
+	s.RLock()
+	if f, ok := s.filters[topic]; ok {
+		s.RUnlock()
+		return f
+	}
+	s.RUnlock()
+
+	s.Lock()
+	if f, ok := s.filters[topic]; ok {
+		s.Unlock()
+		return f
+	}
+	filter, err := newFilter(s.dataPath, topic)
+	if err != nil {
+		log.Fatal(err)
+	}
+	s.filters[topic] = filter
+	s.Unlock()
+	return filter
 }
 
 func (s *Service) Close() {

@@ -18,6 +18,8 @@ message Message {
 message PublishRequest {
     string topic = 1;
     bytes  data  = 2; 
+    bytes  hashKey = 3;
+    bool   ignoreFilter = 4;
 }
 
 message PublishReply {
@@ -25,7 +27,7 @@ message PublishReply {
 
 message PullRequest {
     string topic = 1;
-    bool   ack = 2;
+    bool needAck = 2;
 }
 
 message PullReply {

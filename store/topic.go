@@ -79,6 +79,7 @@ func NewTopic(dataPath, topic string) (*Topic, error) {
 			return nil, err
 		}
 		t.meta.Segments = append(t.meta.Segments, meta)
+		t.sync()
 	}
 	t.wg.Add(1)
 	go func() {
@@ -88,6 +89,11 @@ func NewTopic(dataPath, topic string) (*Topic, error) {
 	t.wg.Add(1)
 	go func() {
 		t.readLoop()
+		t.wg.Done()
+	}()
+	t.wg.Add(1)
+	go func() {
+		t.recycleLoop()
 		t.wg.Done()
 	}()
 	return t, nil
@@ -163,6 +169,7 @@ func (t *Topic) writeOne(msg *pb.Message) error {
 			return err
 		}
 		t.meta.Segments = append(t.meta.Segments, meta)
+		t.sync()
 	}
 	if err := t.curSeg.writeOne(msg); err != nil {
 		return err
@@ -243,6 +250,29 @@ func (t *Topic) readLoop() {
 exit:
 	close(t.readC)
 	log.Infof("topic(%s) exit readLoop.", t.Name)
+}
+
+func (t *Topic) recycleLoop() {
+	ticker := time.NewTicker(time.Hour)
+	for {
+		select {
+		case <-ticker.C:
+			t.Lock()
+			if len(t.meta.Segments) > 0 {
+				seg := t.meta.Segments[0]
+				if seg.ReadID == seg.WriteID {
+					t.segs[0].delete()
+					t.segs = t.segs[1:]
+					t.meta.Segments = t.meta.Segments[1:]
+				}
+			}
+			t.Unlock()
+		case <-t.exitC:
+			goto exit
+		}
+	}
+exit:
+	ticker.Stop()
 }
 
 func (t *Topic) persistMetadata() error {

@@ -2,6 +2,7 @@ package store
 
 import (
 	"fmt"
+	"os"
 	"sync/atomic"
 
 	"github.com/gogo/protobuf/proto"
@@ -26,11 +27,13 @@ type smeta struct {
 
 type segment struct {
 	meta *smeta
+	path string
 	file *mmap.MmapFile
 }
 
 func newSegment(path string, mode, advise int, m *smeta) (*segment, error) {
 	s := &segment{
+		path: path,
 		meta: m,
 	}
 	file, err := mmap.New(path, maxSegmentSize+2*maxMsgSize, mode, advise)
@@ -76,10 +79,16 @@ func (s *segment) writeOne(msg *pb.Message) error {
 func (s *segment) readOne(msgID uint64) (*pb.Message, int64, error) {
 	msg := &pb.Message{}
 	offset := s.meta.ReadPos
-	len := int64(s.file.Uint32At(offset))
+	len, err := s.file.Uint32At(offset)
+	if err != nil {
+		return nil, 0, err
+	}
 	offset += 4
-	buf := s.file.ReadAt(offset, len)
-	offset += len
+	buf, err := s.file.ReadAt(offset, int64(len))
+	if err != nil {
+		return nil, 0, err
+	}
+	offset += int64(len)
 	if err := proto.Unmarshal(buf, msg); err != nil {
 		log.Error(err)
 		return nil, 0, err
@@ -97,6 +106,19 @@ func (s *segment) sync() error {
 
 func (s *segment) close() error {
 	return s.file.Close()
+}
+
+func (s *segment) delete() error {
+	if s.file != nil {
+		if err := s.close(); err != nil {
+			return err
+		}
+		if err := os.Remove(s.path); err != nil {
+			return err
+		}
+		s.file = nil
+	}
+	return nil
 }
 
 type segments []*segment

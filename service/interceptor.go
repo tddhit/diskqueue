@@ -5,6 +5,7 @@ import (
 
 	"github.com/tddhit/box/interceptor"
 	"github.com/tddhit/box/transport/common"
+	"github.com/tddhit/tools/log"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
@@ -20,6 +21,7 @@ func CheckPeerWithUnary(s *Service) interceptor.UnaryServerMiddleware {
 				addr := p.Addr.String()
 				switch info.FullMethod {
 				case "/diskqueue.Diskqueue/Pull":
+					log.Info(addr, "pull")
 					c := s.getOrCreateClient(addr)
 					ctx = context.WithValue(ctx, "client", c)
 				case "/diskqueue.Diskqueue/Ack":
