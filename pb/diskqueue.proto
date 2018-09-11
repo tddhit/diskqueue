@@ -3,10 +3,13 @@ syntax = "proto3";
 package diskqueue;
 
 service Diskqueue {
-    rpc Publish     (PublishRequest)         returns (PublishReply)             {}
-    rpc MPublish    (stream PublishRequest)  returns (PublishReply)             {}
-    rpc Pull        (PullRequest)            returns (PullReply)                {}
-    rpc Ack         (AckRequest)             returns (AckReply)                 {}
+    rpc Push     (PushRequest)         returns (PushReply)    {}
+    rpc MPush    (stream PushRequest)  returns (PushReply)    {}
+    rpc Pop      (PopRequest)          returns (PopReply)     {}
+    rpc Ack      (AckRequest)          returns (AckReply)     {}
+    rpc Join     (JoinRequest)         returns (JoinReply)    {}
+    rpc Leave    (LeaveRequest)        returns (LeaveReply)   {}
+    rpc Snapshot (SnapshotRequest)     returns (SnapshotReply){}
 }
 
 message Message {
@@ -15,22 +18,22 @@ message Message {
     int64   timestamp = 3;
 }
 
-message PublishRequest {
+message PushRequest {
     string topic = 1;
     bytes  data  = 2; 
     bytes  hashKey = 3;
     bool   ignoreFilter = 4;
 }
 
-message PublishReply {
+message PushReply {
 }
 
-message PullRequest {
+message PopRequest {
     string topic = 1;
     bool needAck = 2;
 }
 
-message PullReply {
+message PopReply {
     Message message = 1;
 }
 
@@ -40,4 +43,36 @@ message AckRequest {
 }
 
 message AckReply {
+}
+
+message JoinRequest {
+    string raftAddr = 1;
+    string nodeID = 2;
+}
+
+message JoinReply {
+
+}
+
+message LeaveRequest {
+    string nodeID = 1;
+}
+
+message LeaveReply {
+}
+
+message SnapshotRequest {
+}
+
+message SnapshotReply {
+}
+
+message Command {
+    enum Op {
+        PUSH = 0;          
+        POP = 1;
+    }
+    Op op = 1;
+    string topic = 2;
+    bytes data = 3;
 }

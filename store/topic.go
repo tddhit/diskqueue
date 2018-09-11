@@ -25,19 +25,14 @@ type tmeta struct {
 	Segments []*smeta `json:"segments"`
 }
 
-type Consumer interface {
-	String() string
-}
-
 type Topic struct {
 	sync.RWMutex
-	Name     string
-	dataPath string
-	meta     tmeta
+	Name    string
+	dataDir string
+	meta    tmeta
 
-	curSeg    *segment
-	segs      segments
-	consumers map[string]Consumer
+	curSeg *segment
+	segs   segments
 
 	readC     chan *pb.Message
 	writeC    chan *pb.Message
@@ -52,12 +47,10 @@ type Topic struct {
 	wg       sync.WaitGroup
 }
 
-func NewTopic(dataPath, topic string) (*Topic, error) {
+func NewTopic(dataDir, topic string) (*Topic, error) {
 	t := &Topic{
-		Name:     topic,
-		dataPath: dataPath,
-
-		consumers: make(map[string]Consumer),
+		Name:    topic,
+		dataDir: dataDir,
 
 		readC:     make(chan *pb.Message),
 		writeC:    make(chan *pb.Message),
@@ -99,6 +92,10 @@ func NewTopic(dataPath, topic string) (*Topic, error) {
 	return t, nil
 }
 
+func (t *Topic) Empty() bool {
+	return atomic.LoadUint64(&t.meta.ReadID) == atomic.LoadUint64(&t.meta.WriteID)
+}
+
 func (t *Topic) PutMessage(data []byte) error {
 	t.RLock()
 	defer t.RUnlock()
@@ -112,25 +109,6 @@ func (t *Topic) PutMessage(data []byte) error {
 
 func (t *Topic) GetMessage() *pb.Message {
 	return <-t.readC
-}
-
-func (t *Topic) AddConsumer(c Consumer) error {
-	t.Lock()
-	defer t.Unlock()
-
-	if _, ok := t.consumers[c.String()]; ok {
-		return errors.New("already subscribe.")
-	} else {
-		t.consumers[c.String()] = c
-	}
-	return nil
-}
-
-func (t *Topic) RemoveConsumer(name string) {
-	t.Lock()
-	defer t.Unlock()
-
-	delete(t.consumers, name)
 }
 
 func (t *Topic) seek(msgID uint64) (*segment, error) {
@@ -147,7 +125,7 @@ func (t *Topic) seek(msgID uint64) (*segment, error) {
 }
 
 func (t *Topic) createSegment(mode int, meta *smeta) error {
-	file := fmt.Sprintf(path.Join(t.dataPath, "%s.diskqueue.%d.dat"),
+	file := fmt.Sprintf(path.Join(t.dataDir, "%s.diskqueue.%d.dat"),
 		t.Name, meta.MinID)
 	seg, err := newSegment(file, mode, mmap.SEQUENTIAL, meta)
 	if err != nil {
@@ -276,7 +254,7 @@ exit:
 }
 
 func (t *Topic) persistMetadata() error {
-	filename := fmt.Sprintf(path.Join(t.dataPath, "%s.diskqueue.meta"), t.Name)
+	filename := fmt.Sprintf(path.Join(t.dataDir, "%s.diskqueue.meta"), t.Name)
 	tmpFilename := fmt.Sprintf("%s.%d.tmp", filename, rand.Int())
 	f, err := os.OpenFile(tmpFilename, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
 	if err != nil {
@@ -293,7 +271,7 @@ func (t *Topic) persistMetadata() error {
 }
 
 func (t *Topic) loadMetadata() error {
-	filename := fmt.Sprintf(path.Join(t.dataPath, "%s.diskqueue.meta"), t.Name)
+	filename := fmt.Sprintf(path.Join(t.dataDir, "%s.diskqueue.meta"), t.Name)
 	f, err := os.Open(filename)
 	if err != nil {
 		return err

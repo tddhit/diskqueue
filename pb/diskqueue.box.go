@@ -30,6 +30,29 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
 
+type Command_Op int32
+
+const (
+	Command_PUSH Command_Op = 0
+	Command_POP  Command_Op = 1
+)
+
+var Command_Op_name = map[int32]string{
+	0: "PUSH",
+	1: "POP",
+}
+var Command_Op_value = map[string]int32{
+	"PUSH": 0,
+	"POP":  1,
+}
+
+func (x Command_Op) String() string {
+	return proto.EnumName(Command_Op_name, int32(x))
+}
+func (Command_Op) EnumDescriptor() ([]byte, []int) {
+	return fileDescriptor_diskqueue_ffd221efa8d42f73, []int{13, 0}
+}
+
 type Message struct {
 	ID                   uint64   `protobuf:"varint,1,opt,name=ID,proto3" json:"ID,omitempty"`
 	Data                 []byte   `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
@@ -43,7 +66,7 @@ func (m *Message) Reset()         { *m = Message{} }
 func (m *Message) String() string { return proto.CompactTextString(m) }
 func (*Message) ProtoMessage()    {}
 func (*Message) Descriptor() ([]byte, []int) {
-	return fileDescriptor_diskqueue_17490c04a98e3f89, []int{0}
+	return fileDescriptor_diskqueue_ffd221efa8d42f73, []int{0}
 }
 func (m *Message) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Message.Unmarshal(m, b)
@@ -84,7 +107,7 @@ func (m *Message) GetTimestamp() int64 {
 	return 0
 }
 
-type PublishRequest struct {
+type PushRequest struct {
 	Topic                string   `protobuf:"bytes,1,opt,name=topic,proto3" json:"topic,omitempty"`
 	Data                 []byte   `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
 	HashKey              []byte   `protobuf:"bytes,3,opt,name=hashKey,proto3" json:"hashKey,omitempty"`
@@ -94,89 +117,89 @@ type PublishRequest struct {
 	XXX_sizecache        int32    `json:"-"`
 }
 
-func (m *PublishRequest) Reset()         { *m = PublishRequest{} }
-func (m *PublishRequest) String() string { return proto.CompactTextString(m) }
-func (*PublishRequest) ProtoMessage()    {}
-func (*PublishRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_diskqueue_17490c04a98e3f89, []int{1}
+func (m *PushRequest) Reset()         { *m = PushRequest{} }
+func (m *PushRequest) String() string { return proto.CompactTextString(m) }
+func (*PushRequest) ProtoMessage()    {}
+func (*PushRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_diskqueue_ffd221efa8d42f73, []int{1}
 }
-func (m *PublishRequest) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_PublishRequest.Unmarshal(m, b)
+func (m *PushRequest) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_PushRequest.Unmarshal(m, b)
 }
-func (m *PublishRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_PublishRequest.Marshal(b, m, deterministic)
+func (m *PushRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_PushRequest.Marshal(b, m, deterministic)
 }
-func (dst *PublishRequest) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_PublishRequest.Merge(dst, src)
+func (dst *PushRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_PushRequest.Merge(dst, src)
 }
-func (m *PublishRequest) XXX_Size() int {
-	return xxx_messageInfo_PublishRequest.Size(m)
+func (m *PushRequest) XXX_Size() int {
+	return xxx_messageInfo_PushRequest.Size(m)
 }
-func (m *PublishRequest) XXX_DiscardUnknown() {
-	xxx_messageInfo_PublishRequest.DiscardUnknown(m)
+func (m *PushRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_PushRequest.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_PublishRequest proto.InternalMessageInfo
+var xxx_messageInfo_PushRequest proto.InternalMessageInfo
 
-func (m *PublishRequest) GetTopic() string {
+func (m *PushRequest) GetTopic() string {
 	if m != nil {
 		return m.Topic
 	}
 	return ""
 }
 
-func (m *PublishRequest) GetData() []byte {
+func (m *PushRequest) GetData() []byte {
 	if m != nil {
 		return m.Data
 	}
 	return nil
 }
 
-func (m *PublishRequest) GetHashKey() []byte {
+func (m *PushRequest) GetHashKey() []byte {
 	if m != nil {
 		return m.HashKey
 	}
 	return nil
 }
 
-func (m *PublishRequest) GetIgnoreFilter() bool {
+func (m *PushRequest) GetIgnoreFilter() bool {
 	if m != nil {
 		return m.IgnoreFilter
 	}
 	return false
 }
 
-type PublishReply struct {
+type PushReply struct {
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
 }
 
-func (m *PublishReply) Reset()         { *m = PublishReply{} }
-func (m *PublishReply) String() string { return proto.CompactTextString(m) }
-func (*PublishReply) ProtoMessage()    {}
-func (*PublishReply) Descriptor() ([]byte, []int) {
-	return fileDescriptor_diskqueue_17490c04a98e3f89, []int{2}
+func (m *PushReply) Reset()         { *m = PushReply{} }
+func (m *PushReply) String() string { return proto.CompactTextString(m) }
+func (*PushReply) ProtoMessage()    {}
+func (*PushReply) Descriptor() ([]byte, []int) {
+	return fileDescriptor_diskqueue_ffd221efa8d42f73, []int{2}
 }
-func (m *PublishReply) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_PublishReply.Unmarshal(m, b)
+func (m *PushReply) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_PushReply.Unmarshal(m, b)
 }
-func (m *PublishReply) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_PublishReply.Marshal(b, m, deterministic)
+func (m *PushReply) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_PushReply.Marshal(b, m, deterministic)
 }
-func (dst *PublishReply) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_PublishReply.Merge(dst, src)
+func (dst *PushReply) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_PushReply.Merge(dst, src)
 }
-func (m *PublishReply) XXX_Size() int {
-	return xxx_messageInfo_PublishReply.Size(m)
+func (m *PushReply) XXX_Size() int {
+	return xxx_messageInfo_PushReply.Size(m)
 }
-func (m *PublishReply) XXX_DiscardUnknown() {
-	xxx_messageInfo_PublishReply.DiscardUnknown(m)
+func (m *PushReply) XXX_DiscardUnknown() {
+	xxx_messageInfo_PushReply.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_PublishReply proto.InternalMessageInfo
+var xxx_messageInfo_PushReply proto.InternalMessageInfo
 
-type PullRequest struct {
+type PopRequest struct {
 	Topic                string   `protobuf:"bytes,1,opt,name=topic,proto3" json:"topic,omitempty"`
 	NeedAck              bool     `protobuf:"varint,2,opt,name=needAck,proto3" json:"needAck,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
@@ -184,76 +207,76 @@ type PullRequest struct {
 	XXX_sizecache        int32    `json:"-"`
 }
 
-func (m *PullRequest) Reset()         { *m = PullRequest{} }
-func (m *PullRequest) String() string { return proto.CompactTextString(m) }
-func (*PullRequest) ProtoMessage()    {}
-func (*PullRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_diskqueue_17490c04a98e3f89, []int{3}
+func (m *PopRequest) Reset()         { *m = PopRequest{} }
+func (m *PopRequest) String() string { return proto.CompactTextString(m) }
+func (*PopRequest) ProtoMessage()    {}
+func (*PopRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_diskqueue_ffd221efa8d42f73, []int{3}
 }
-func (m *PullRequest) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_PullRequest.Unmarshal(m, b)
+func (m *PopRequest) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_PopRequest.Unmarshal(m, b)
 }
-func (m *PullRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_PullRequest.Marshal(b, m, deterministic)
+func (m *PopRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_PopRequest.Marshal(b, m, deterministic)
 }
-func (dst *PullRequest) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_PullRequest.Merge(dst, src)
+func (dst *PopRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_PopRequest.Merge(dst, src)
 }
-func (m *PullRequest) XXX_Size() int {
-	return xxx_messageInfo_PullRequest.Size(m)
+func (m *PopRequest) XXX_Size() int {
+	return xxx_messageInfo_PopRequest.Size(m)
 }
-func (m *PullRequest) XXX_DiscardUnknown() {
-	xxx_messageInfo_PullRequest.DiscardUnknown(m)
+func (m *PopRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_PopRequest.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_PullRequest proto.InternalMessageInfo
+var xxx_messageInfo_PopRequest proto.InternalMessageInfo
 
-func (m *PullRequest) GetTopic() string {
+func (m *PopRequest) GetTopic() string {
 	if m != nil {
 		return m.Topic
 	}
 	return ""
 }
 
-func (m *PullRequest) GetNeedAck() bool {
+func (m *PopRequest) GetNeedAck() bool {
 	if m != nil {
 		return m.NeedAck
 	}
 	return false
 }
 
-type PullReply struct {
+type PopReply struct {
 	Message              *Message `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
 }
 
-func (m *PullReply) Reset()         { *m = PullReply{} }
-func (m *PullReply) String() string { return proto.CompactTextString(m) }
-func (*PullReply) ProtoMessage()    {}
-func (*PullReply) Descriptor() ([]byte, []int) {
-	return fileDescriptor_diskqueue_17490c04a98e3f89, []int{4}
+func (m *PopReply) Reset()         { *m = PopReply{} }
+func (m *PopReply) String() string { return proto.CompactTextString(m) }
+func (*PopReply) ProtoMessage()    {}
+func (*PopReply) Descriptor() ([]byte, []int) {
+	return fileDescriptor_diskqueue_ffd221efa8d42f73, []int{4}
 }
-func (m *PullReply) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_PullReply.Unmarshal(m, b)
+func (m *PopReply) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_PopReply.Unmarshal(m, b)
 }
-func (m *PullReply) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_PullReply.Marshal(b, m, deterministic)
+func (m *PopReply) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_PopReply.Marshal(b, m, deterministic)
 }
-func (dst *PullReply) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_PullReply.Merge(dst, src)
+func (dst *PopReply) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_PopReply.Merge(dst, src)
 }
-func (m *PullReply) XXX_Size() int {
-	return xxx_messageInfo_PullReply.Size(m)
+func (m *PopReply) XXX_Size() int {
+	return xxx_messageInfo_PopReply.Size(m)
 }
-func (m *PullReply) XXX_DiscardUnknown() {
-	xxx_messageInfo_PullReply.DiscardUnknown(m)
+func (m *PopReply) XXX_DiscardUnknown() {
+	xxx_messageInfo_PopReply.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_PullReply proto.InternalMessageInfo
+var xxx_messageInfo_PopReply proto.InternalMessageInfo
 
-func (m *PullReply) GetMessage() *Message {
+func (m *PopReply) GetMessage() *Message {
 	if m != nil {
 		return m.Message
 	}
@@ -272,7 +295,7 @@ func (m *AckRequest) Reset()         { *m = AckRequest{} }
 func (m *AckRequest) String() string { return proto.CompactTextString(m) }
 func (*AckRequest) ProtoMessage()    {}
 func (*AckRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_diskqueue_17490c04a98e3f89, []int{5}
+	return fileDescriptor_diskqueue_ffd221efa8d42f73, []int{5}
 }
 func (m *AckRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_AckRequest.Unmarshal(m, b)
@@ -316,7 +339,7 @@ func (m *AckReply) Reset()         { *m = AckReply{} }
 func (m *AckReply) String() string { return proto.CompactTextString(m) }
 func (*AckReply) ProtoMessage()    {}
 func (*AckReply) Descriptor() ([]byte, []int) {
-	return fileDescriptor_diskqueue_17490c04a98e3f89, []int{6}
+	return fileDescriptor_diskqueue_ffd221efa8d42f73, []int{6}
 }
 func (m *AckReply) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_AckReply.Unmarshal(m, b)
@@ -336,14 +359,280 @@ func (m *AckReply) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_AckReply proto.InternalMessageInfo
 
+type JoinRequest struct {
+	RaftAddr             string   `protobuf:"bytes,1,opt,name=raftAddr,proto3" json:"raftAddr,omitempty"`
+	NodeID               string   `protobuf:"bytes,2,opt,name=nodeID,proto3" json:"nodeID,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *JoinRequest) Reset()         { *m = JoinRequest{} }
+func (m *JoinRequest) String() string { return proto.CompactTextString(m) }
+func (*JoinRequest) ProtoMessage()    {}
+func (*JoinRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_diskqueue_ffd221efa8d42f73, []int{7}
+}
+func (m *JoinRequest) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_JoinRequest.Unmarshal(m, b)
+}
+func (m *JoinRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_JoinRequest.Marshal(b, m, deterministic)
+}
+func (dst *JoinRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_JoinRequest.Merge(dst, src)
+}
+func (m *JoinRequest) XXX_Size() int {
+	return xxx_messageInfo_JoinRequest.Size(m)
+}
+func (m *JoinRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_JoinRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_JoinRequest proto.InternalMessageInfo
+
+func (m *JoinRequest) GetRaftAddr() string {
+	if m != nil {
+		return m.RaftAddr
+	}
+	return ""
+}
+
+func (m *JoinRequest) GetNodeID() string {
+	if m != nil {
+		return m.NodeID
+	}
+	return ""
+}
+
+type JoinReply struct {
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *JoinReply) Reset()         { *m = JoinReply{} }
+func (m *JoinReply) String() string { return proto.CompactTextString(m) }
+func (*JoinReply) ProtoMessage()    {}
+func (*JoinReply) Descriptor() ([]byte, []int) {
+	return fileDescriptor_diskqueue_ffd221efa8d42f73, []int{8}
+}
+func (m *JoinReply) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_JoinReply.Unmarshal(m, b)
+}
+func (m *JoinReply) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_JoinReply.Marshal(b, m, deterministic)
+}
+func (dst *JoinReply) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_JoinReply.Merge(dst, src)
+}
+func (m *JoinReply) XXX_Size() int {
+	return xxx_messageInfo_JoinReply.Size(m)
+}
+func (m *JoinReply) XXX_DiscardUnknown() {
+	xxx_messageInfo_JoinReply.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_JoinReply proto.InternalMessageInfo
+
+type LeaveRequest struct {
+	NodeID               string   `protobuf:"bytes,1,opt,name=nodeID,proto3" json:"nodeID,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *LeaveRequest) Reset()         { *m = LeaveRequest{} }
+func (m *LeaveRequest) String() string { return proto.CompactTextString(m) }
+func (*LeaveRequest) ProtoMessage()    {}
+func (*LeaveRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_diskqueue_ffd221efa8d42f73, []int{9}
+}
+func (m *LeaveRequest) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_LeaveRequest.Unmarshal(m, b)
+}
+func (m *LeaveRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_LeaveRequest.Marshal(b, m, deterministic)
+}
+func (dst *LeaveRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_LeaveRequest.Merge(dst, src)
+}
+func (m *LeaveRequest) XXX_Size() int {
+	return xxx_messageInfo_LeaveRequest.Size(m)
+}
+func (m *LeaveRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_LeaveRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_LeaveRequest proto.InternalMessageInfo
+
+func (m *LeaveRequest) GetNodeID() string {
+	if m != nil {
+		return m.NodeID
+	}
+	return ""
+}
+
+type LeaveReply struct {
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *LeaveReply) Reset()         { *m = LeaveReply{} }
+func (m *LeaveReply) String() string { return proto.CompactTextString(m) }
+func (*LeaveReply) ProtoMessage()    {}
+func (*LeaveReply) Descriptor() ([]byte, []int) {
+	return fileDescriptor_diskqueue_ffd221efa8d42f73, []int{10}
+}
+func (m *LeaveReply) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_LeaveReply.Unmarshal(m, b)
+}
+func (m *LeaveReply) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_LeaveReply.Marshal(b, m, deterministic)
+}
+func (dst *LeaveReply) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_LeaveReply.Merge(dst, src)
+}
+func (m *LeaveReply) XXX_Size() int {
+	return xxx_messageInfo_LeaveReply.Size(m)
+}
+func (m *LeaveReply) XXX_DiscardUnknown() {
+	xxx_messageInfo_LeaveReply.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_LeaveReply proto.InternalMessageInfo
+
+type SnapshotRequest struct {
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *SnapshotRequest) Reset()         { *m = SnapshotRequest{} }
+func (m *SnapshotRequest) String() string { return proto.CompactTextString(m) }
+func (*SnapshotRequest) ProtoMessage()    {}
+func (*SnapshotRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_diskqueue_ffd221efa8d42f73, []int{11}
+}
+func (m *SnapshotRequest) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_SnapshotRequest.Unmarshal(m, b)
+}
+func (m *SnapshotRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_SnapshotRequest.Marshal(b, m, deterministic)
+}
+func (dst *SnapshotRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_SnapshotRequest.Merge(dst, src)
+}
+func (m *SnapshotRequest) XXX_Size() int {
+	return xxx_messageInfo_SnapshotRequest.Size(m)
+}
+func (m *SnapshotRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_SnapshotRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_SnapshotRequest proto.InternalMessageInfo
+
+type SnapshotReply struct {
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *SnapshotReply) Reset()         { *m = SnapshotReply{} }
+func (m *SnapshotReply) String() string { return proto.CompactTextString(m) }
+func (*SnapshotReply) ProtoMessage()    {}
+func (*SnapshotReply) Descriptor() ([]byte, []int) {
+	return fileDescriptor_diskqueue_ffd221efa8d42f73, []int{12}
+}
+func (m *SnapshotReply) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_SnapshotReply.Unmarshal(m, b)
+}
+func (m *SnapshotReply) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_SnapshotReply.Marshal(b, m, deterministic)
+}
+func (dst *SnapshotReply) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_SnapshotReply.Merge(dst, src)
+}
+func (m *SnapshotReply) XXX_Size() int {
+	return xxx_messageInfo_SnapshotReply.Size(m)
+}
+func (m *SnapshotReply) XXX_DiscardUnknown() {
+	xxx_messageInfo_SnapshotReply.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_SnapshotReply proto.InternalMessageInfo
+
+type Command struct {
+	Op                   Command_Op `protobuf:"varint,1,opt,name=op,proto3,enum=diskqueue.Command_Op" json:"op,omitempty"`
+	Topic                string     `protobuf:"bytes,2,opt,name=topic,proto3" json:"topic,omitempty"`
+	Data                 []byte     `protobuf:"bytes,3,opt,name=data,proto3" json:"data,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}   `json:"-"`
+	XXX_unrecognized     []byte     `json:"-"`
+	XXX_sizecache        int32      `json:"-"`
+}
+
+func (m *Command) Reset()         { *m = Command{} }
+func (m *Command) String() string { return proto.CompactTextString(m) }
+func (*Command) ProtoMessage()    {}
+func (*Command) Descriptor() ([]byte, []int) {
+	return fileDescriptor_diskqueue_ffd221efa8d42f73, []int{13}
+}
+func (m *Command) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_Command.Unmarshal(m, b)
+}
+func (m *Command) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_Command.Marshal(b, m, deterministic)
+}
+func (dst *Command) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Command.Merge(dst, src)
+}
+func (m *Command) XXX_Size() int {
+	return xxx_messageInfo_Command.Size(m)
+}
+func (m *Command) XXX_DiscardUnknown() {
+	xxx_messageInfo_Command.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_Command proto.InternalMessageInfo
+
+func (m *Command) GetOp() Command_Op {
+	if m != nil {
+		return m.Op
+	}
+	return Command_PUSH
+}
+
+func (m *Command) GetTopic() string {
+	if m != nil {
+		return m.Topic
+	}
+	return ""
+}
+
+func (m *Command) GetData() []byte {
+	if m != nil {
+		return m.Data
+	}
+	return nil
+}
+
 func init() {
 	proto.RegisterType((*Message)(nil), "diskqueue.Message")
-	proto.RegisterType((*PublishRequest)(nil), "diskqueue.PublishRequest")
-	proto.RegisterType((*PublishReply)(nil), "diskqueue.PublishReply")
-	proto.RegisterType((*PullRequest)(nil), "diskqueue.PullRequest")
-	proto.RegisterType((*PullReply)(nil), "diskqueue.PullReply")
+	proto.RegisterType((*PushRequest)(nil), "diskqueue.PushRequest")
+	proto.RegisterType((*PushReply)(nil), "diskqueue.PushReply")
+	proto.RegisterType((*PopRequest)(nil), "diskqueue.PopRequest")
+	proto.RegisterType((*PopReply)(nil), "diskqueue.PopReply")
 	proto.RegisterType((*AckRequest)(nil), "diskqueue.AckRequest")
 	proto.RegisterType((*AckReply)(nil), "diskqueue.AckReply")
+	proto.RegisterType((*JoinRequest)(nil), "diskqueue.JoinRequest")
+	proto.RegisterType((*JoinReply)(nil), "diskqueue.JoinReply")
+	proto.RegisterType((*LeaveRequest)(nil), "diskqueue.LeaveRequest")
+	proto.RegisterType((*LeaveReply)(nil), "diskqueue.LeaveReply")
+	proto.RegisterType((*SnapshotRequest)(nil), "diskqueue.SnapshotRequest")
+	proto.RegisterType((*SnapshotReply)(nil), "diskqueue.SnapshotReply")
+	proto.RegisterType((*Command)(nil), "diskqueue.Command")
+	proto.RegisterEnum("diskqueue.Command_Op", Command_Op_name, Command_Op_value)
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -352,10 +641,13 @@ var _ tr.ClientConn
 var _ tropt.CallOption
 
 type DiskqueueGrpcClient interface {
-	Publish(ctx context.Context, in *PublishRequest, opts ...tropt.CallOption) (*PublishReply, error)
-	MPublish(ctx context.Context, opts ...tropt.CallOption) (Diskqueue_MPublishClient, error)
-	Pull(ctx context.Context, in *PullRequest, opts ...tropt.CallOption) (*PullReply, error)
+	Push(ctx context.Context, in *PushRequest, opts ...tropt.CallOption) (*PushReply, error)
+	MPush(ctx context.Context, opts ...tropt.CallOption) (Diskqueue_MPushClient, error)
+	Pop(ctx context.Context, in *PopRequest, opts ...tropt.CallOption) (*PopReply, error)
 	Ack(ctx context.Context, in *AckRequest, opts ...tropt.CallOption) (*AckReply, error)
+	Join(ctx context.Context, in *JoinRequest, opts ...tropt.CallOption) (*JoinReply, error)
+	Leave(ctx context.Context, in *LeaveRequest, opts ...tropt.CallOption) (*LeaveReply, error)
+	Snapshot(ctx context.Context, in *SnapshotRequest, opts ...tropt.CallOption) (*SnapshotReply, error)
 }
 
 type diskqueueGrpcClient struct {
@@ -366,27 +658,27 @@ func NewDiskqueueGrpcClient(cc tr.ClientConn) DiskqueueGrpcClient {
 	return &diskqueueGrpcClient{cc}
 }
 
-func (c *diskqueueGrpcClient) Publish(ctx context.Context, in *PublishRequest, opts ...tropt.CallOption) (*PublishReply, error) {
-	out := new(PublishReply)
-	err := c.cc.Invoke(ctx, "/diskqueue.Diskqueue/Publish", in, out, opts...)
+func (c *diskqueueGrpcClient) Push(ctx context.Context, in *PushRequest, opts ...tropt.CallOption) (*PushReply, error) {
+	out := new(PushReply)
+	err := c.cc.Invoke(ctx, "/diskqueue.Diskqueue/Push", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *diskqueueGrpcClient) MPublish(ctx context.Context, opts ...tropt.CallOption) (Diskqueue_MPublishClient, error) {
-	stream, err := c.cc.NewStream(ctx, DiskqueueGrpcServiceDesc, 0, "/diskqueue.Diskqueue/MPublish", opts...)
+func (c *diskqueueGrpcClient) MPush(ctx context.Context, opts ...tropt.CallOption) (Diskqueue_MPushClient, error) {
+	stream, err := c.cc.NewStream(ctx, DiskqueueGrpcServiceDesc, 0, "/diskqueue.Diskqueue/MPush", opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &diskqueueMPublishClient{stream}
+	x := &diskqueueMPushClient{stream}
 	return x, nil
 }
 
-func (c *diskqueueGrpcClient) Pull(ctx context.Context, in *PullRequest, opts ...tropt.CallOption) (*PullReply, error) {
-	out := new(PullReply)
-	err := c.cc.Invoke(ctx, "/diskqueue.Diskqueue/Pull", in, out, opts...)
+func (c *diskqueueGrpcClient) Pop(ctx context.Context, in *PopRequest, opts ...tropt.CallOption) (*PopReply, error) {
+	out := new(PopReply)
+	err := c.cc.Invoke(ctx, "/diskqueue.Diskqueue/Pop", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -396,6 +688,33 @@ func (c *diskqueueGrpcClient) Pull(ctx context.Context, in *PullRequest, opts ..
 func (c *diskqueueGrpcClient) Ack(ctx context.Context, in *AckRequest, opts ...tropt.CallOption) (*AckReply, error) {
 	out := new(AckReply)
 	err := c.cc.Invoke(ctx, "/diskqueue.Diskqueue/Ack", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *diskqueueGrpcClient) Join(ctx context.Context, in *JoinRequest, opts ...tropt.CallOption) (*JoinReply, error) {
+	out := new(JoinReply)
+	err := c.cc.Invoke(ctx, "/diskqueue.Diskqueue/Join", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *diskqueueGrpcClient) Leave(ctx context.Context, in *LeaveRequest, opts ...tropt.CallOption) (*LeaveReply, error) {
+	out := new(LeaveReply)
+	err := c.cc.Invoke(ctx, "/diskqueue.Diskqueue/Leave", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *diskqueueGrpcClient) Snapshot(ctx context.Context, in *SnapshotRequest, opts ...tropt.CallOption) (*SnapshotReply, error) {
+	out := new(SnapshotReply)
+	err := c.cc.Invoke(ctx, "/diskqueue.Diskqueue/Snapshot", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -424,10 +743,13 @@ const _ = grpc1.SupportPackageIsVersion4
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
 type DiskqueueClient interface {
-	Publish(ctx context1.Context, in *PublishRequest, opts ...grpc1.CallOption) (*PublishReply, error)
-	MPublish(ctx context1.Context, opts ...grpc1.CallOption) (Diskqueue_MPublishClient, error)
-	Pull(ctx context1.Context, in *PullRequest, opts ...grpc1.CallOption) (*PullReply, error)
+	Push(ctx context1.Context, in *PushRequest, opts ...grpc1.CallOption) (*PushReply, error)
+	MPush(ctx context1.Context, opts ...grpc1.CallOption) (Diskqueue_MPushClient, error)
+	Pop(ctx context1.Context, in *PopRequest, opts ...grpc1.CallOption) (*PopReply, error)
 	Ack(ctx context1.Context, in *AckRequest, opts ...grpc1.CallOption) (*AckReply, error)
+	Join(ctx context1.Context, in *JoinRequest, opts ...grpc1.CallOption) (*JoinReply, error)
+	Leave(ctx context1.Context, in *LeaveRequest, opts ...grpc1.CallOption) (*LeaveReply, error)
+	Snapshot(ctx context1.Context, in *SnapshotRequest, opts ...grpc1.CallOption) (*SnapshotReply, error)
 }
 
 type diskqueueClient struct {
@@ -438,52 +760,52 @@ func NewDiskqueueClient(cc *grpc1.ClientConn) DiskqueueClient {
 	return &diskqueueClient{cc}
 }
 
-func (c *diskqueueClient) Publish(ctx context1.Context, in *PublishRequest, opts ...grpc1.CallOption) (*PublishReply, error) {
-	out := new(PublishReply)
-	err := c.cc.Invoke(ctx, "/diskqueue.Diskqueue/Publish", in, out, opts...)
+func (c *diskqueueClient) Push(ctx context1.Context, in *PushRequest, opts ...grpc1.CallOption) (*PushReply, error) {
+	out := new(PushReply)
+	err := c.cc.Invoke(ctx, "/diskqueue.Diskqueue/Push", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *diskqueueClient) MPublish(ctx context1.Context, opts ...grpc1.CallOption) (Diskqueue_MPublishClient, error) {
-	stream, err := c.cc.NewStream(ctx, &_Diskqueue_serviceDesc.Streams[0], "/diskqueue.Diskqueue/MPublish", opts...)
+func (c *diskqueueClient) MPush(ctx context1.Context, opts ...grpc1.CallOption) (Diskqueue_MPushClient, error) {
+	stream, err := c.cc.NewStream(ctx, &_Diskqueue_serviceDesc.Streams[0], "/diskqueue.Diskqueue/MPush", opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &diskqueueMPublishClient{stream}
+	x := &diskqueueMPushClient{stream}
 	return x, nil
 }
 
-type Diskqueue_MPublishClient interface {
-	Send(*PublishRequest) error
-	CloseAndRecv() (*PublishReply, error)
+type Diskqueue_MPushClient interface {
+	Send(*PushRequest) error
+	CloseAndRecv() (*PushReply, error)
 	grpc1.ClientStream
 }
 
-type diskqueueMPublishClient struct {
+type diskqueueMPushClient struct {
 	grpc1.ClientStream
 }
 
-func (x *diskqueueMPublishClient) Send(m *PublishRequest) error {
+func (x *diskqueueMPushClient) Send(m *PushRequest) error {
 	return x.ClientStream.SendMsg(m)
 }
 
-func (x *diskqueueMPublishClient) CloseAndRecv() (*PublishReply, error) {
+func (x *diskqueueMPushClient) CloseAndRecv() (*PushReply, error) {
 	if err := x.ClientStream.CloseSend(); err != nil {
 		return nil, err
 	}
-	m := new(PublishReply)
+	m := new(PushReply)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
 	return m, nil
 }
 
-func (c *diskqueueClient) Pull(ctx context1.Context, in *PullRequest, opts ...grpc1.CallOption) (*PullReply, error) {
-	out := new(PullReply)
-	err := c.cc.Invoke(ctx, "/diskqueue.Diskqueue/Pull", in, out, opts...)
+func (c *diskqueueClient) Pop(ctx context1.Context, in *PopRequest, opts ...grpc1.CallOption) (*PopReply, error) {
+	out := new(PopReply)
+	err := c.cc.Invoke(ctx, "/diskqueue.Diskqueue/Pop", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -499,76 +821,106 @@ func (c *diskqueueClient) Ack(ctx context1.Context, in *AckRequest, opts ...grpc
 	return out, nil
 }
 
+func (c *diskqueueClient) Join(ctx context1.Context, in *JoinRequest, opts ...grpc1.CallOption) (*JoinReply, error) {
+	out := new(JoinReply)
+	err := c.cc.Invoke(ctx, "/diskqueue.Diskqueue/Join", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *diskqueueClient) Leave(ctx context1.Context, in *LeaveRequest, opts ...grpc1.CallOption) (*LeaveReply, error) {
+	out := new(LeaveReply)
+	err := c.cc.Invoke(ctx, "/diskqueue.Diskqueue/Leave", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *diskqueueClient) Snapshot(ctx context1.Context, in *SnapshotRequest, opts ...grpc1.CallOption) (*SnapshotReply, error) {
+	out := new(SnapshotReply)
+	err := c.cc.Invoke(ctx, "/diskqueue.Diskqueue/Snapshot", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // DiskqueueServer is the server API for Diskqueue service.
 type DiskqueueServer interface {
-	Publish(context1.Context, *PublishRequest) (*PublishReply, error)
-	MPublish(Diskqueue_MPublishServer) error
-	Pull(context1.Context, *PullRequest) (*PullReply, error)
+	Push(context1.Context, *PushRequest) (*PushReply, error)
+	MPush(Diskqueue_MPushServer) error
+	Pop(context1.Context, *PopRequest) (*PopReply, error)
 	Ack(context1.Context, *AckRequest) (*AckReply, error)
+	Join(context1.Context, *JoinRequest) (*JoinReply, error)
+	Leave(context1.Context, *LeaveRequest) (*LeaveReply, error)
+	Snapshot(context1.Context, *SnapshotRequest) (*SnapshotReply, error)
 }
 
 func RegisterDiskqueueServer(s *grpc1.Server, srv DiskqueueServer) {
 	s.RegisterService(&_Diskqueue_serviceDesc, srv)
 }
 
-func _Diskqueue_Publish_Handler(srv interface{}, ctx context1.Context, dec func(interface{}) error, interceptor grpc1.UnaryServerInterceptor) (interface{}, error) {
-	in := new(PublishRequest)
+func _Diskqueue_Push_Handler(srv interface{}, ctx context1.Context, dec func(interface{}) error, interceptor grpc1.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PushRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(DiskqueueServer).Publish(ctx, in)
+		return srv.(DiskqueueServer).Push(ctx, in)
 	}
 	info := &grpc1.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/diskqueue.Diskqueue/Publish",
+		FullMethod: "/diskqueue.Diskqueue/Push",
 	}
 	handler := func(ctx context1.Context, req interface{}) (interface{}, error) {
-		return srv.(DiskqueueServer).Publish(ctx, req.(*PublishRequest))
+		return srv.(DiskqueueServer).Push(ctx, req.(*PushRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Diskqueue_MPublish_Handler(srv interface{}, stream grpc1.ServerStream) error {
-	return srv.(DiskqueueServer).MPublish(&diskqueueMPublishServer{stream})
+func _Diskqueue_MPush_Handler(srv interface{}, stream grpc1.ServerStream) error {
+	return srv.(DiskqueueServer).MPush(&diskqueueMPushServer{stream})
 }
 
-type Diskqueue_MPublishServer interface {
-	SendAndClose(*PublishReply) error
-	Recv() (*PublishRequest, error)
+type Diskqueue_MPushServer interface {
+	SendAndClose(*PushReply) error
+	Recv() (*PushRequest, error)
 	grpc1.ServerStream
 }
 
-type diskqueueMPublishServer struct {
+type diskqueueMPushServer struct {
 	grpc1.ServerStream
 }
 
-func (x *diskqueueMPublishServer) SendAndClose(m *PublishReply) error {
+func (x *diskqueueMPushServer) SendAndClose(m *PushReply) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-func (x *diskqueueMPublishServer) Recv() (*PublishRequest, error) {
-	m := new(PublishRequest)
+func (x *diskqueueMPushServer) Recv() (*PushRequest, error) {
+	m := new(PushRequest)
 	if err := x.ServerStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
 	return m, nil
 }
 
-func _Diskqueue_Pull_Handler(srv interface{}, ctx context1.Context, dec func(interface{}) error, interceptor grpc1.UnaryServerInterceptor) (interface{}, error) {
-	in := new(PullRequest)
+func _Diskqueue_Pop_Handler(srv interface{}, ctx context1.Context, dec func(interface{}) error, interceptor grpc1.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PopRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(DiskqueueServer).Pull(ctx, in)
+		return srv.(DiskqueueServer).Pop(ctx, in)
 	}
 	info := &grpc1.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/diskqueue.Diskqueue/Pull",
+		FullMethod: "/diskqueue.Diskqueue/Pop",
 	}
 	handler := func(ctx context1.Context, req interface{}) (interface{}, error) {
-		return srv.(DiskqueueServer).Pull(ctx, req.(*PullRequest))
+		return srv.(DiskqueueServer).Pop(ctx, req.(*PopRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -591,57 +943,134 @@ func _Diskqueue_Ack_Handler(srv interface{}, ctx context1.Context, dec func(inte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Diskqueue_Join_Handler(srv interface{}, ctx context1.Context, dec func(interface{}) error, interceptor grpc1.UnaryServerInterceptor) (interface{}, error) {
+	in := new(JoinRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DiskqueueServer).Join(ctx, in)
+	}
+	info := &grpc1.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/diskqueue.Diskqueue/Join",
+	}
+	handler := func(ctx context1.Context, req interface{}) (interface{}, error) {
+		return srv.(DiskqueueServer).Join(ctx, req.(*JoinRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Diskqueue_Leave_Handler(srv interface{}, ctx context1.Context, dec func(interface{}) error, interceptor grpc1.UnaryServerInterceptor) (interface{}, error) {
+	in := new(LeaveRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DiskqueueServer).Leave(ctx, in)
+	}
+	info := &grpc1.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/diskqueue.Diskqueue/Leave",
+	}
+	handler := func(ctx context1.Context, req interface{}) (interface{}, error) {
+		return srv.(DiskqueueServer).Leave(ctx, req.(*LeaveRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Diskqueue_Snapshot_Handler(srv interface{}, ctx context1.Context, dec func(interface{}) error, interceptor grpc1.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SnapshotRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DiskqueueServer).Snapshot(ctx, in)
+	}
+	info := &grpc1.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/diskqueue.Diskqueue/Snapshot",
+	}
+	handler := func(ctx context1.Context, req interface{}) (interface{}, error) {
+		return srv.(DiskqueueServer).Snapshot(ctx, req.(*SnapshotRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 var _Diskqueue_serviceDesc = grpc1.ServiceDesc{
 	ServiceName: "diskqueue.Diskqueue",
 	HandlerType: (*DiskqueueServer)(nil),
 	Methods: []grpc1.MethodDesc{
 		{
-			MethodName: "Publish",
-			Handler:    _Diskqueue_Publish_Handler,
+			MethodName: "Push",
+			Handler:    _Diskqueue_Push_Handler,
 		},
 		{
-			MethodName: "Pull",
-			Handler:    _Diskqueue_Pull_Handler,
+			MethodName: "Pop",
+			Handler:    _Diskqueue_Pop_Handler,
 		},
 		{
 			MethodName: "Ack",
 			Handler:    _Diskqueue_Ack_Handler,
 		},
+		{
+			MethodName: "Join",
+			Handler:    _Diskqueue_Join_Handler,
+		},
+		{
+			MethodName: "Leave",
+			Handler:    _Diskqueue_Leave_Handler,
+		},
+		{
+			MethodName: "Snapshot",
+			Handler:    _Diskqueue_Snapshot_Handler,
+		},
 	},
 	Streams: []grpc1.StreamDesc{
 		{
-			StreamName:    "MPublish",
-			Handler:       _Diskqueue_MPublish_Handler,
+			StreamName:    "MPush",
+			Handler:       _Diskqueue_MPush_Handler,
 			ClientStreams: true,
 		},
 	},
 	Metadata: "diskqueue.proto",
 }
 
-func init() { proto.RegisterFile("diskqueue.proto", fileDescriptor_diskqueue_17490c04a98e3f89) }
+func init() { proto.RegisterFile("diskqueue.proto", fileDescriptor_diskqueue_ffd221efa8d42f73) }
 
-var fileDescriptor_diskqueue_17490c04a98e3f89 = []byte{
-	// 348 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xa4, 0x92, 0x4f, 0x6b, 0xea, 0x40,
-	0x14, 0xc5, 0xdf, 0x68, 0x7c, 0x49, 0xae, 0xc1, 0x07, 0xf7, 0xf9, 0x5e, 0x53, 0xe9, 0x22, 0xcc,
-	0x2a, 0x8b, 0xe2, 0x42, 0xa1, 0xb4, 0x8b, 0x52, 0x2c, 0xa1, 0x20, 0x22, 0xc8, 0x7c, 0x83, 0x18,
-	0x07, 0x0d, 0x99, 0x98, 0xe8, 0x4c, 0xa0, 0xf9, 0xf0, 0x85, 0xe2, 0xc4, 0xf8, 0xa7, 0x15, 0x37,
-	0xdd, 0xe5, 0x9e, 0x99, 0x73, 0xce, 0xcd, 0x8f, 0x81, 0x3f, 0x8b, 0x58, 0x26, 0x9b, 0x82, 0x17,
-	0xbc, 0x9f, 0x6f, 0x33, 0x95, 0xa1, 0x7d, 0x10, 0xe8, 0x04, 0xcc, 0x29, 0x97, 0x32, 0x5c, 0x72,
-	0xec, 0x40, 0x63, 0x1c, 0xb8, 0xc4, 0x23, 0xbe, 0xc1, 0x1a, 0xe3, 0x00, 0x11, 0x8c, 0x45, 0xa8,
-	0x42, 0xb7, 0xe1, 0x11, 0xdf, 0x61, 0xfa, 0x1b, 0xef, 0xc0, 0x56, 0x71, 0xca, 0xa5, 0x0a, 0xd3,
-	0xdc, 0x6d, 0x7a, 0xc4, 0x6f, 0xb2, 0xa3, 0x40, 0xdf, 0xa1, 0x33, 0x2b, 0xe6, 0x22, 0x96, 0x2b,
-	0xc6, 0x37, 0x05, 0x97, 0x0a, 0xbb, 0xd0, 0x52, 0x59, 0x1e, 0x47, 0x3a, 0xd6, 0x66, 0xd5, 0x70,
-	0x31, 0xd9, 0x05, 0x73, 0x15, 0xca, 0xd5, 0x84, 0x97, 0x3a, 0xd7, 0x61, 0xf5, 0x88, 0x14, 0x9c,
-	0x78, 0xb9, 0xce, 0xb6, 0xfc, 0x2d, 0x16, 0x8a, 0x6f, 0x5d, 0xc3, 0x23, 0xbe, 0xc5, 0xce, 0x34,
-	0xda, 0x01, 0xe7, 0xd0, 0x9c, 0x8b, 0x92, 0x3e, 0x43, 0x7b, 0x56, 0x08, 0x71, 0x7d, 0x0d, 0x17,
-	0xcc, 0x35, 0xe7, 0x8b, 0x51, 0x94, 0xe8, 0x4d, 0x2c, 0x56, 0x8f, 0xf4, 0x09, 0xec, 0xca, 0x9e,
-	0x8b, 0x12, 0xef, 0xc1, 0x4c, 0x2b, 0x44, 0xda, 0xde, 0x1e, 0x60, 0xff, 0x08, 0x74, 0x0f, 0x8f,
-	0xd5, 0x57, 0xe8, 0x23, 0xc0, 0x28, 0x4a, 0xae, 0x17, 0x77, 0xa1, 0x95, 0xca, 0xe5, 0x38, 0xd0,
-	0xb5, 0x06, 0xab, 0x06, 0x0a, 0x60, 0x69, 0x67, 0x2e, 0xca, 0xc1, 0x07, 0x01, 0x3b, 0xa8, 0x4b,
-	0xf0, 0x05, 0xcc, 0xfd, 0xdf, 0xe1, 0xed, 0x49, 0xf7, 0x39, 0xeb, 0xde, 0xcd, 0xa5, 0xa3, 0x1d,
-	0x8c, 0x5f, 0xf8, 0x0a, 0xd6, 0xf4, 0x47, 0x09, 0x3e, 0xc1, 0x07, 0x30, 0x76, 0x4c, 0xf0, 0xff,
-	0xd9, 0xa5, 0x03, 0xe3, 0x5e, 0xf7, 0x9b, 0x5e, 0x75, 0x0f, 0xa1, 0x39, 0x8a, 0x12, 0xfc, 0x77,
-	0x72, 0x7c, 0x04, 0xd4, 0xfb, 0xfb, 0x55, 0xd6, 0xa6, 0xf9, 0x6f, 0xfd, 0x50, 0x87, 0x9f, 0x01,
-	0x00, 0x00, 0xff, 0xff, 0x4a, 0x56, 0x6e, 0xcd, 0xbb, 0x02, 0x00, 0x00,
+var fileDescriptor_diskqueue_ffd221efa8d42f73 = []byte{
+	// 516 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x9c, 0x54, 0x4d, 0x6f, 0xda, 0x40,
+	0x10, 0xc5, 0x1f, 0xc4, 0xf6, 0x40, 0x43, 0x3a, 0x25, 0x89, 0x65, 0xf5, 0x80, 0x56, 0x6a, 0xc5,
+	0xa1, 0xe2, 0x00, 0x52, 0x95, 0x4a, 0xbd, 0xd0, 0xa2, 0xaa, 0x34, 0x8d, 0xb0, 0x36, 0xea, 0x0f,
+	0x70, 0xf1, 0x16, 0x2c, 0xb0, 0x77, 0xc3, 0x9a, 0x4a, 0xfc, 0x9a, 0xfe, 0xd5, 0xca, 0x6b, 0x1b,
+	0xdb, 0x09, 0xca, 0x21, 0x37, 0xcf, 0xec, 0xbc, 0x37, 0x33, 0x6f, 0x9e, 0x0c, 0xbd, 0x30, 0x92,
+	0x9b, 0x87, 0x3d, 0xdb, 0xb3, 0x91, 0xd8, 0xf1, 0x94, 0xa3, 0x73, 0x4c, 0x90, 0x5b, 0xb0, 0xee,
+	0x98, 0x94, 0xc1, 0x8a, 0xe1, 0x39, 0xe8, 0xf3, 0x99, 0xab, 0x0d, 0xb4, 0xa1, 0x49, 0xf5, 0xf9,
+	0x0c, 0x11, 0xcc, 0x30, 0x48, 0x03, 0x57, 0x1f, 0x68, 0xc3, 0x2e, 0x55, 0xdf, 0xf8, 0x16, 0x9c,
+	0x34, 0x8a, 0x99, 0x4c, 0x83, 0x58, 0xb8, 0xc6, 0x40, 0x1b, 0x1a, 0xb4, 0x4a, 0x90, 0x3d, 0x74,
+	0xfc, 0xbd, 0x5c, 0x53, 0xf6, 0xb0, 0x67, 0x32, 0xc5, 0x3e, 0xb4, 0x53, 0x2e, 0xa2, 0xa5, 0xe2,
+	0x74, 0x68, 0x1e, 0x9c, 0xa4, 0x75, 0xc1, 0x5a, 0x07, 0x72, 0x7d, 0xcb, 0x0e, 0x8a, 0xb4, 0x4b,
+	0xcb, 0x10, 0x09, 0x74, 0xa3, 0x55, 0xc2, 0x77, 0xec, 0x5b, 0xb4, 0x4d, 0xd9, 0xce, 0x35, 0x07,
+	0xda, 0xd0, 0xa6, 0x8d, 0x1c, 0xe9, 0x80, 0x93, 0xb7, 0x15, 0xdb, 0x03, 0xf9, 0x0c, 0xe0, 0x73,
+	0xf1, 0xfc, 0x08, 0x2e, 0x58, 0x09, 0x63, 0xe1, 0x74, 0xb9, 0x51, 0x53, 0xd8, 0xb4, 0x0c, 0xc9,
+	0x0d, 0xd8, 0x0a, 0x2d, 0xb6, 0x07, 0xfc, 0x00, 0x56, 0x9c, 0x4b, 0xa3, 0xd0, 0x9d, 0x31, 0x8e,
+	0x2a, 0x21, 0x0b, 0xd1, 0x68, 0x59, 0x42, 0x6e, 0x00, 0xa6, 0xcb, 0xcd, 0xf3, 0x7d, 0xfb, 0xd0,
+	0x8e, 0xe5, 0x6a, 0x3e, 0x53, 0x5d, 0x4d, 0x9a, 0x07, 0x04, 0xc0, 0x56, 0xc8, 0x6c, 0xfa, 0x29,
+	0x74, 0x7e, 0xf0, 0x28, 0x29, 0x69, 0x3c, 0xb0, 0x77, 0xc1, 0x9f, 0x74, 0x1a, 0x86, 0xbb, 0x82,
+	0xe9, 0x18, 0xe3, 0x15, 0x9c, 0x25, 0x3c, 0x64, 0x05, 0x9b, 0x43, 0x8b, 0x28, 0x53, 0x23, 0xa7,
+	0xc8, 0xf8, 0xde, 0x43, 0xf7, 0x27, 0x0b, 0xfe, 0xb2, 0x92, 0xb0, 0x02, 0x69, 0x0d, 0x50, 0x17,
+	0xa0, 0xa8, 0xcb, 0x50, 0xaf, 0xa1, 0x77, 0x9f, 0x04, 0x42, 0xae, 0x79, 0x5a, 0x00, 0x49, 0x0f,
+	0x5e, 0x55, 0xa9, 0xac, 0x46, 0x82, 0xf5, 0x95, 0xc7, 0x71, 0x90, 0x84, 0xf8, 0x0e, 0x74, 0x2e,
+	0x14, 0xe1, 0xf9, 0xf8, 0xb2, 0xa6, 0x51, 0xf1, 0x3e, 0x5a, 0x08, 0xaa, 0x73, 0x51, 0x69, 0xa2,
+	0x9f, 0xb2, 0x83, 0x51, 0xd9, 0x81, 0x5c, 0x83, 0xbe, 0x10, 0x68, 0x83, 0xe9, 0xff, 0xba, 0xff,
+	0x7e, 0xd1, 0x42, 0x0b, 0x0c, 0x7f, 0xe1, 0x5f, 0x68, 0xe3, 0x7f, 0x06, 0x38, 0xb3, 0x92, 0x1f,
+	0x3f, 0x82, 0x99, 0xdd, 0x1d, 0xaf, 0x6a, 0x3d, 0x6b, 0xfe, 0xf3, 0xfa, 0x4f, 0xf2, 0xd9, 0xe0,
+	0x2d, 0xfc, 0x04, 0xed, 0xbb, 0x97, 0x00, 0x87, 0x1a, 0x4e, 0xc0, 0xf0, 0xb9, 0xc0, 0xfa, 0x96,
+	0x95, 0xdb, 0xbc, 0x37, 0x8f, 0xd3, 0x79, 0xbf, 0x09, 0x18, 0xd3, 0xe5, 0xa6, 0x01, 0xaa, 0xac,
+	0xd2, 0x00, 0x1d, 0x7d, 0xd0, 0xca, 0x96, 0xcb, 0xce, 0xd8, 0x98, 0xb1, 0x66, 0x8d, 0xc6, 0x8c,
+	0xd5, 0xbd, 0xd5, 0x72, 0xea, 0x92, 0x78, 0x5d, 0x2b, 0xa8, 0x7b, 0xc0, 0xbb, 0x7c, 0xfa, 0x90,
+	0x43, 0xbf, 0x80, 0x5d, 0xde, 0x18, 0xbd, 0x5a, 0xd1, 0x23, 0x2f, 0x78, 0xee, 0xc9, 0x37, 0xc5,
+	0xf1, 0xfb, 0x4c, 0xfd, 0x61, 0x26, 0xff, 0x03, 0x00, 0x00, 0xff, 0xff, 0xec, 0xcb, 0xeb, 0x07,
+	0x74, 0x04, 0x00, 0x00,
 }

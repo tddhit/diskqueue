@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/tddhit/box/mw"
 	"github.com/tddhit/tools/dirlock"
 	"github.com/tddhit/tools/log"
 	"google.golang.org/grpc/codes"
@@ -15,25 +16,50 @@ import (
 	"github.com/tddhit/diskqueue/store"
 )
 
+type queue interface {
+	Push(topic string, data []byte) error
+	Pop(topic string) *pb.Message
+	getTopic(name string) (*store.Topic, bool)
+	getOrCreateTopic(name string) *store.Topic
+	join(raftAddr, nodeID string) error
+	leave(nodeID string) error
+	snapshot() error
+	close() error
+}
+
 type Service struct {
 	sync.RWMutex
-	topics   map[string]*store.Topic
-	clients  map[string]*client
-	filters  map[string]*filter
-	dataPath string
-	dl       *dirlock.DirLock
-
+	queue         queue
+	clients       map[string]*client
+	filters       map[string]*filter
+	dataDir       string
+	dl            *dirlock.DirLock
 	filterCounter *prometheus.CounterVec
 }
 
-func New(dataPath string) *Service {
+func New(dataDir, mode, raftAddr, nodeID, leaderAddr string) *Service {
+	if !mw.IsWorker() {
+		return nil
+	}
+	var q queue
+	switch mode {
+	case "cluster":
+		cs, err := newClusterStore(dataDir, raftAddr, nodeID, leaderAddr)
+		if err != nil {
+			log.Fatal(err)
+		}
+		q = cs
+	case "standalone":
+		fallthrough
+	default:
+		q = newStandaloneStore(dataDir)
+	}
 	s := &Service{
-		topics:   make(map[string]*store.Topic),
-		filters:  make(map[string]*filter),
-		clients:  make(map[string]*client),
-		dataPath: dataPath,
-		dl:       dirlock.New(dataPath),
-
+		queue:   q,
+		filters: make(map[string]*filter),
+		clients: make(map[string]*client),
+		dataDir: dataDir,
+		dl:      dirlock.New(dataDir),
 		filterCounter: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
 				Name: "filter_count",
@@ -49,10 +75,9 @@ func New(dataPath string) *Service {
 	return s
 }
 
-func (s *Service) Publish(ctx context.Context,
-	in *pb.PublishRequest) (*pb.PublishReply, error) {
+func (s *Service) Push(ctx context.Context,
+	in *pb.PushRequest) (*pb.PushReply, error) {
 
-	topic := s.getOrCreateTopic(in.GetTopic())
 	filter := s.getOrCreateFilter(in.GetTopic())
 	if !in.GetIgnoreFilter() {
 		key := in.GetData()
@@ -61,40 +86,41 @@ func (s *Service) Publish(ctx context.Context,
 		}
 		if filter.mayContain(key) {
 			s.filterCounter.WithLabelValues().Inc()
+			log.Debug("filter:", string(key))
 			return nil, status.Error(codes.AlreadyExists, "filter by bloom")
 		} else {
+			log.Debug("add:", string(key))
 			if err := filter.add(key); err != nil {
 				return nil, status.Error(codes.Internal, err.Error())
 			}
 		}
 	}
-	if err := topic.PutMessage(in.GetData()); err != nil {
-		return nil, status.Error(codes.Aborted, err.Error())
+	if err := s.queue.Push(in.Topic, in.Data); err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
 	}
-	return &pb.PublishReply{}, nil
+	return &pb.PushReply{}, nil
 }
 
-func (s *Service) MPublish(stream pb.Diskqueue_MPublishServer) error {
+func (s *Service) MPush(stream pb.Diskqueue_MPushServer) error {
 	for {
 		in, err := stream.Recv()
 		if err == io.EOF {
-			return stream.SendAndClose(&pb.PublishReply{})
+			return stream.SendAndClose(&pb.PushReply{})
 		}
 		if err != nil {
 			log.Error(err)
 			return err
 		}
-		topic := s.getOrCreateTopic(in.GetTopic())
-		if err := topic.PutMessage(in.GetData()); err != nil {
-			return status.Error(codes.Aborted, err.Error())
+		if err := s.queue.Push(in.Topic, in.Data); err != nil {
+			return status.Error(codes.Internal, err.Error())
 		}
 	}
 }
 
-func (s *Service) Pull(ctx context.Context,
-	in *pb.PullRequest) (*pb.PullReply, error) {
+func (s *Service) Pop(ctx context.Context,
+	in *pb.PopRequest) (*pb.PopReply, error) {
 
-	topic := s.getOrCreateTopic(in.GetTopic())
+	topic := s.queue.getOrCreateTopic(in.GetTopic())
 	var msg *pb.Message
 	if in.GetNeedAck() {
 		client := ctx.Value("client").(*client)
@@ -103,14 +129,14 @@ func (s *Service) Pull(ctx context.Context,
 		for inflight.full() {
 			inflight.cond.Wait()
 		}
-		msg = topic.GetMessage()
+		msg = s.queue.Pop(in.GetTopic())
 		inflight.push(msg)
 		inflight.cond.L.Unlock()
 	} else {
-		msg = topic.GetMessage()
+		msg = s.queue.Pop(in.GetTopic())
 	}
 	if msg != nil {
-		return &pb.PullReply{
+		return &pb.PopReply{
 			Message: msg,
 		}, nil
 	}
@@ -121,8 +147,7 @@ func (s *Service) Ack(ctx context.Context,
 	in *pb.AckRequest) (*pb.AckReply, error) {
 
 	client := ctx.Value("client").(*client)
-	log.Info(s.topics, ",", in.GetTopic(), ",")
-	topic, exist := s.getTopic(in.GetTopic())
+	topic, exist := s.queue.getTopic(in.GetTopic())
 	if !exist {
 		return nil, status.Error(codes.FailedPrecondition,
 			"not found topic in diskqueue")
@@ -138,34 +163,28 @@ func (s *Service) Ack(ctx context.Context,
 	return &pb.AckReply{}, nil
 }
 
-func (s *Service) getTopic(name string) (*store.Topic, bool) {
-	s.RLock()
-	defer s.RUnlock()
+func (s *Service) Join(ctx context.Context,
+	in *pb.JoinRequest) (*pb.JoinReply, error) {
 
-	t, ok := s.topics[name]
-	return t, ok
+	if err := s.queue.join(in.GetRaftAddr(), in.GetNodeID()); err != nil {
+		return nil, err
+	}
+	return &pb.JoinReply{}, nil
 }
 
-func (s *Service) getOrCreateTopic(name string) *store.Topic {
-	s.RLock()
-	if t, ok := s.topics[name]; ok {
-		s.RUnlock()
-		return t
-	}
-	s.RUnlock()
+func (s *Service) Leave(ctx context.Context,
+	in *pb.LeaveRequest) (*pb.LeaveReply, error) {
 
-	s.Lock()
-	if t, ok := s.topics[name]; ok {
-		s.Unlock()
-		return t
+	if err := s.queue.leave(in.GetNodeID()); err != nil {
+		return nil, err
 	}
-	topic, err := store.NewTopic(s.dataPath, name)
-	if err != nil {
-		log.Fatal(err)
-	}
-	s.topics[name] = topic
-	s.Unlock()
-	return topic
+	return &pb.LeaveReply{}, nil
+}
+
+func (s *Service) Snapshot(ctx context.Context,
+	in *pb.SnapshotRequest) (*pb.SnapshotReply, error) {
+
+	return nil, nil
 }
 
 func (s *Service) getClient(addr string) (*client, bool) {
@@ -219,7 +238,7 @@ func (s *Service) getOrCreateFilter(topic string) *filter {
 		s.Unlock()
 		return f
 	}
-	filter, err := newFilter(s.dataPath, topic)
+	filter, err := newFilter(s.dataDir, topic)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -232,7 +251,5 @@ func (s *Service) Close() {
 	s.Lock()
 	defer s.Unlock()
 
-	for _, t := range s.topics {
-		t.Close()
-	}
+	s.queue.close()
 }

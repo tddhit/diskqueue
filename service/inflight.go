@@ -7,9 +7,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/tddhit/tools/log"
+
 	pb "github.com/tddhit/diskqueue/pb"
 	"github.com/tddhit/diskqueue/store"
-	"github.com/tddhit/tools/log"
 )
 
 const (
@@ -19,7 +20,7 @@ const (
 type inflight struct {
 	sync.RWMutex
 	topic   *store.Topic
-	queue   *pqueue
+	pqueue  *pqueue
 	m       map[uint64]*pb.Message
 	cond    *sync.Cond
 	timeout int64
@@ -29,13 +30,13 @@ type inflight struct {
 func newInflight(t *store.Topic) *inflight {
 	f := &inflight{
 		topic:   t,
-		queue:   &pqueue{},
+		pqueue:  &pqueue{},
 		m:       make(map[uint64]*pb.Message, maxInflight),
 		cond:    sync.NewCond(&sync.Mutex{}),
 		timeout: int64(10 * time.Second),
 		exitC:   make(chan struct{}),
 	}
-	heap.Init(f.queue)
+	heap.Init(f.pqueue)
 	go f.scanLoop()
 	return f
 }
@@ -76,7 +77,7 @@ func (f *inflight) push(msg *pb.Message) {
 	defer f.Unlock()
 
 	msg.Timestamp = time.Now().UnixNano()
-	heap.Push(f.queue, msg)
+	heap.Push(f.pqueue, msg)
 	f.m[msg.GetID()] = msg
 	log.Info("push", msg.GetID())
 }
@@ -85,12 +86,12 @@ func (f *inflight) pop(now int64) (*pb.Message, error) {
 	f.Lock()
 	defer f.Unlock()
 
-	if f.queue.Len() == 0 {
+	if f.pqueue.Len() == 0 {
 		return nil, errors.New("inFlightQueue is empty.")
 	}
-	msg := heap.Pop(f.queue).(*pb.Message)
+	msg := heap.Pop(f.pqueue).(*pb.Message)
 	if now < msg.GetTimestamp()+f.timeout {
-		heap.Push(f.queue, msg)
+		heap.Push(f.pqueue, msg)
 		return nil, errors.New("no timeout message.")
 	}
 	if _, ok := f.m[msg.GetID()]; ok {
