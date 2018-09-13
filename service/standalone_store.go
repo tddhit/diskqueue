@@ -3,78 +3,43 @@ package service
 import (
 	"sync"
 
-	"github.com/tddhit/tools/log"
-
 	pb "github.com/tddhit/diskqueue/pb"
 	"github.com/tddhit/diskqueue/store"
 )
 
 type standaloneStore struct {
 	sync.RWMutex
-	dataDir string
-	topics  map[string]*store.Topic
+	*store.Queue
 }
 
 func newStandaloneStore(dataDir string) *standaloneStore {
 	return &standaloneStore{
-		dataDir: dataDir,
-		topics:  make(map[string]*store.Topic),
+		Queue: store.NewQueue(dataDir),
 	}
 }
 
-func (s *standaloneStore) Push(topic string, data []byte) error {
-	t := s.getOrCreateTopic(topic)
-	if err := t.PutMessage(data); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (s *standaloneStore) Pop(topic string) *pb.Message {
-	t := s.getOrCreateTopic(topic)
-	return t.GetMessage()
-}
-
-func (s *standaloneStore) getTopic(name string) (*store.Topic, bool) {
-	s.RLock()
-	defer s.RUnlock()
-
-	t, ok := s.topics[name]
-	return t, ok
-}
-
-func (s *standaloneStore) getOrCreateTopic(name string) *store.Topic {
-	s.RLock()
-	if t, ok := s.topics[name]; ok {
-		s.RUnlock()
-		return t
-	}
-	s.RUnlock()
-
+func (s *standaloneStore) Pop(topic string) (*pb.Message, error) {
 	s.Lock()
-	if t, ok := s.topics[name]; ok {
-		s.Unlock()
-		return t
-	}
-	topic, err := store.NewTopic(s.dataDir, name)
+	defer s.Unlock()
+
+	msg, pos, err := s.Queue.GetMessage(topic)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
-	s.topics[name] = topic
-	s.Unlock()
-	return topic
+	s.Queue.Advance(topic, pos)
+	return msg, nil
 }
 
-func (s *standaloneStore) join(raftAddr, nodeID string) error {
+func (s *standaloneStore) Join(raftAddr, nodeID string) error {
 	return nil
 }
-func (s *standaloneStore) leave(nodeID string) error {
+func (s *standaloneStore) Leave(nodeID string) error {
 	return nil
 }
-func (s *standaloneStore) snapshot() error {
+func (s *standaloneStore) Snapshot() error {
 	return nil
 }
 
-func (s *standaloneStore) close() error {
+func (s *standaloneStore) Close() error {
 	return nil
 }

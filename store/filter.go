@@ -1,4 +1,4 @@
-package service
+package store
 
 import (
 	"encoding/json"

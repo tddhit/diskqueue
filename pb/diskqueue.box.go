@@ -33,30 +33,31 @@ const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
 type Command_Op int32
 
 const (
-	Command_PUSH Command_Op = 0
-	Command_POP  Command_Op = 1
+	Command_PUSH    Command_Op = 0
+	Command_ADVANCE Command_Op = 1
 )
 
 var Command_Op_name = map[int32]string{
 	0: "PUSH",
-	1: "POP",
+	1: "ADVANCE",
 }
 var Command_Op_value = map[string]int32{
-	"PUSH": 0,
-	"POP":  1,
+	"PUSH":    0,
+	"ADVANCE": 1,
 }
 
 func (x Command_Op) String() string {
 	return proto.EnumName(Command_Op_name, int32(x))
 }
 func (Command_Op) EnumDescriptor() ([]byte, []int) {
-	return fileDescriptor_diskqueue_ffd221efa8d42f73, []int{13, 0}
+	return fileDescriptor_diskqueue_776e86b699c54ecd, []int{13, 0}
 }
 
 type Message struct {
 	ID                   uint64   `protobuf:"varint,1,opt,name=ID,proto3" json:"ID,omitempty"`
 	Data                 []byte   `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
-	Timestamp            int64    `protobuf:"varint,3,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	HashKey              []byte   `protobuf:"bytes,3,opt,name=hashKey,proto3" json:"hashKey,omitempty"`
+	Timestamp            int64    `protobuf:"varint,4,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
@@ -66,7 +67,7 @@ func (m *Message) Reset()         { *m = Message{} }
 func (m *Message) String() string { return proto.CompactTextString(m) }
 func (*Message) ProtoMessage()    {}
 func (*Message) Descriptor() ([]byte, []int) {
-	return fileDescriptor_diskqueue_ffd221efa8d42f73, []int{0}
+	return fileDescriptor_diskqueue_776e86b699c54ecd, []int{0}
 }
 func (m *Message) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Message.Unmarshal(m, b)
@@ -100,6 +101,13 @@ func (m *Message) GetData() []byte {
 	return nil
 }
 
+func (m *Message) GetHashKey() []byte {
+	if m != nil {
+		return m.HashKey
+	}
+	return nil
+}
+
 func (m *Message) GetTimestamp() int64 {
 	if m != nil {
 		return m.Timestamp
@@ -121,7 +129,7 @@ func (m *PushRequest) Reset()         { *m = PushRequest{} }
 func (m *PushRequest) String() string { return proto.CompactTextString(m) }
 func (*PushRequest) ProtoMessage()    {}
 func (*PushRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_diskqueue_ffd221efa8d42f73, []int{1}
+	return fileDescriptor_diskqueue_776e86b699c54ecd, []int{1}
 }
 func (m *PushRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_PushRequest.Unmarshal(m, b)
@@ -179,7 +187,7 @@ func (m *PushReply) Reset()         { *m = PushReply{} }
 func (m *PushReply) String() string { return proto.CompactTextString(m) }
 func (*PushReply) ProtoMessage()    {}
 func (*PushReply) Descriptor() ([]byte, []int) {
-	return fileDescriptor_diskqueue_ffd221efa8d42f73, []int{2}
+	return fileDescriptor_diskqueue_776e86b699c54ecd, []int{2}
 }
 func (m *PushReply) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_PushReply.Unmarshal(m, b)
@@ -211,7 +219,7 @@ func (m *PopRequest) Reset()         { *m = PopRequest{} }
 func (m *PopRequest) String() string { return proto.CompactTextString(m) }
 func (*PopRequest) ProtoMessage()    {}
 func (*PopRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_diskqueue_ffd221efa8d42f73, []int{3}
+	return fileDescriptor_diskqueue_776e86b699c54ecd, []int{3}
 }
 func (m *PopRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_PopRequest.Unmarshal(m, b)
@@ -256,7 +264,7 @@ func (m *PopReply) Reset()         { *m = PopReply{} }
 func (m *PopReply) String() string { return proto.CompactTextString(m) }
 func (*PopReply) ProtoMessage()    {}
 func (*PopReply) Descriptor() ([]byte, []int) {
-	return fileDescriptor_diskqueue_ffd221efa8d42f73, []int{4}
+	return fileDescriptor_diskqueue_776e86b699c54ecd, []int{4}
 }
 func (m *PopReply) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_PopReply.Unmarshal(m, b)
@@ -295,7 +303,7 @@ func (m *AckRequest) Reset()         { *m = AckRequest{} }
 func (m *AckRequest) String() string { return proto.CompactTextString(m) }
 func (*AckRequest) ProtoMessage()    {}
 func (*AckRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_diskqueue_ffd221efa8d42f73, []int{5}
+	return fileDescriptor_diskqueue_776e86b699c54ecd, []int{5}
 }
 func (m *AckRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_AckRequest.Unmarshal(m, b)
@@ -339,7 +347,7 @@ func (m *AckReply) Reset()         { *m = AckReply{} }
 func (m *AckReply) String() string { return proto.CompactTextString(m) }
 func (*AckReply) ProtoMessage()    {}
 func (*AckReply) Descriptor() ([]byte, []int) {
-	return fileDescriptor_diskqueue_ffd221efa8d42f73, []int{6}
+	return fileDescriptor_diskqueue_776e86b699c54ecd, []int{6}
 }
 func (m *AckReply) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_AckReply.Unmarshal(m, b)
@@ -371,7 +379,7 @@ func (m *JoinRequest) Reset()         { *m = JoinRequest{} }
 func (m *JoinRequest) String() string { return proto.CompactTextString(m) }
 func (*JoinRequest) ProtoMessage()    {}
 func (*JoinRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_diskqueue_ffd221efa8d42f73, []int{7}
+	return fileDescriptor_diskqueue_776e86b699c54ecd, []int{7}
 }
 func (m *JoinRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_JoinRequest.Unmarshal(m, b)
@@ -415,7 +423,7 @@ func (m *JoinReply) Reset()         { *m = JoinReply{} }
 func (m *JoinReply) String() string { return proto.CompactTextString(m) }
 func (*JoinReply) ProtoMessage()    {}
 func (*JoinReply) Descriptor() ([]byte, []int) {
-	return fileDescriptor_diskqueue_ffd221efa8d42f73, []int{8}
+	return fileDescriptor_diskqueue_776e86b699c54ecd, []int{8}
 }
 func (m *JoinReply) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_JoinReply.Unmarshal(m, b)
@@ -446,7 +454,7 @@ func (m *LeaveRequest) Reset()         { *m = LeaveRequest{} }
 func (m *LeaveRequest) String() string { return proto.CompactTextString(m) }
 func (*LeaveRequest) ProtoMessage()    {}
 func (*LeaveRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_diskqueue_ffd221efa8d42f73, []int{9}
+	return fileDescriptor_diskqueue_776e86b699c54ecd, []int{9}
 }
 func (m *LeaveRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_LeaveRequest.Unmarshal(m, b)
@@ -483,7 +491,7 @@ func (m *LeaveReply) Reset()         { *m = LeaveReply{} }
 func (m *LeaveReply) String() string { return proto.CompactTextString(m) }
 func (*LeaveReply) ProtoMessage()    {}
 func (*LeaveReply) Descriptor() ([]byte, []int) {
-	return fileDescriptor_diskqueue_ffd221efa8d42f73, []int{10}
+	return fileDescriptor_diskqueue_776e86b699c54ecd, []int{10}
 }
 func (m *LeaveReply) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_LeaveReply.Unmarshal(m, b)
@@ -513,7 +521,7 @@ func (m *SnapshotRequest) Reset()         { *m = SnapshotRequest{} }
 func (m *SnapshotRequest) String() string { return proto.CompactTextString(m) }
 func (*SnapshotRequest) ProtoMessage()    {}
 func (*SnapshotRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_diskqueue_ffd221efa8d42f73, []int{11}
+	return fileDescriptor_diskqueue_776e86b699c54ecd, []int{11}
 }
 func (m *SnapshotRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_SnapshotRequest.Unmarshal(m, b)
@@ -543,7 +551,7 @@ func (m *SnapshotReply) Reset()         { *m = SnapshotReply{} }
 func (m *SnapshotReply) String() string { return proto.CompactTextString(m) }
 func (*SnapshotReply) ProtoMessage()    {}
 func (*SnapshotReply) Descriptor() ([]byte, []int) {
-	return fileDescriptor_diskqueue_ffd221efa8d42f73, []int{12}
+	return fileDescriptor_diskqueue_776e86b699c54ecd, []int{12}
 }
 func (m *SnapshotReply) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_SnapshotReply.Unmarshal(m, b)
@@ -567,6 +575,8 @@ type Command struct {
 	Op                   Command_Op `protobuf:"varint,1,opt,name=op,proto3,enum=diskqueue.Command_Op" json:"op,omitempty"`
 	Topic                string     `protobuf:"bytes,2,opt,name=topic,proto3" json:"topic,omitempty"`
 	Data                 []byte     `protobuf:"bytes,3,opt,name=data,proto3" json:"data,omitempty"`
+	HashKey              []byte     `protobuf:"bytes,4,opt,name=hashKey,proto3" json:"hashKey,omitempty"`
+	ReadPos              int64      `protobuf:"varint,5,opt,name=readPos,proto3" json:"readPos,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}   `json:"-"`
 	XXX_unrecognized     []byte     `json:"-"`
 	XXX_sizecache        int32      `json:"-"`
@@ -576,7 +586,7 @@ func (m *Command) Reset()         { *m = Command{} }
 func (m *Command) String() string { return proto.CompactTextString(m) }
 func (*Command) ProtoMessage()    {}
 func (*Command) Descriptor() ([]byte, []int) {
-	return fileDescriptor_diskqueue_ffd221efa8d42f73, []int{13}
+	return fileDescriptor_diskqueue_776e86b699c54ecd, []int{13}
 }
 func (m *Command) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Command.Unmarshal(m, b)
@@ -617,6 +627,20 @@ func (m *Command) GetData() []byte {
 	return nil
 }
 
+func (m *Command) GetHashKey() []byte {
+	if m != nil {
+		return m.HashKey
+	}
+	return nil
+}
+
+func (m *Command) GetReadPos() int64 {
+	if m != nil {
+		return m.ReadPos
+	}
+	return 0
+}
+
 func init() {
 	proto.RegisterType((*Message)(nil), "diskqueue.Message")
 	proto.RegisterType((*PushRequest)(nil), "diskqueue.PushRequest")
@@ -642,7 +666,6 @@ var _ tropt.CallOption
 
 type DiskqueueGrpcClient interface {
 	Push(ctx context.Context, in *PushRequest, opts ...tropt.CallOption) (*PushReply, error)
-	MPush(ctx context.Context, opts ...tropt.CallOption) (Diskqueue_MPushClient, error)
 	Pop(ctx context.Context, in *PopRequest, opts ...tropt.CallOption) (*PopReply, error)
 	Ack(ctx context.Context, in *AckRequest, opts ...tropt.CallOption) (*AckReply, error)
 	Join(ctx context.Context, in *JoinRequest, opts ...tropt.CallOption) (*JoinReply, error)
@@ -665,15 +688,6 @@ func (c *diskqueueGrpcClient) Push(ctx context.Context, in *PushRequest, opts ..
 		return nil, err
 	}
 	return out, nil
-}
-
-func (c *diskqueueGrpcClient) MPush(ctx context.Context, opts ...tropt.CallOption) (Diskqueue_MPushClient, error) {
-	stream, err := c.cc.NewStream(ctx, DiskqueueGrpcServiceDesc, 0, "/diskqueue.Diskqueue/MPush", opts...)
-	if err != nil {
-		return nil, err
-	}
-	x := &diskqueueMPushClient{stream}
-	return x, nil
 }
 
 func (c *diskqueueGrpcClient) Pop(ctx context.Context, in *PopRequest, opts ...tropt.CallOption) (*PopReply, error) {
@@ -744,7 +758,6 @@ const _ = grpc1.SupportPackageIsVersion4
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
 type DiskqueueClient interface {
 	Push(ctx context1.Context, in *PushRequest, opts ...grpc1.CallOption) (*PushReply, error)
-	MPush(ctx context1.Context, opts ...grpc1.CallOption) (Diskqueue_MPushClient, error)
 	Pop(ctx context1.Context, in *PopRequest, opts ...grpc1.CallOption) (*PopReply, error)
 	Ack(ctx context1.Context, in *AckRequest, opts ...grpc1.CallOption) (*AckReply, error)
 	Join(ctx context1.Context, in *JoinRequest, opts ...grpc1.CallOption) (*JoinReply, error)
@@ -767,40 +780,6 @@ func (c *diskqueueClient) Push(ctx context1.Context, in *PushRequest, opts ...gr
 		return nil, err
 	}
 	return out, nil
-}
-
-func (c *diskqueueClient) MPush(ctx context1.Context, opts ...grpc1.CallOption) (Diskqueue_MPushClient, error) {
-	stream, err := c.cc.NewStream(ctx, &_Diskqueue_serviceDesc.Streams[0], "/diskqueue.Diskqueue/MPush", opts...)
-	if err != nil {
-		return nil, err
-	}
-	x := &diskqueueMPushClient{stream}
-	return x, nil
-}
-
-type Diskqueue_MPushClient interface {
-	Send(*PushRequest) error
-	CloseAndRecv() (*PushReply, error)
-	grpc1.ClientStream
-}
-
-type diskqueueMPushClient struct {
-	grpc1.ClientStream
-}
-
-func (x *diskqueueMPushClient) Send(m *PushRequest) error {
-	return x.ClientStream.SendMsg(m)
-}
-
-func (x *diskqueueMPushClient) CloseAndRecv() (*PushReply, error) {
-	if err := x.ClientStream.CloseSend(); err != nil {
-		return nil, err
-	}
-	m := new(PushReply)
-	if err := x.ClientStream.RecvMsg(m); err != nil {
-		return nil, err
-	}
-	return m, nil
 }
 
 func (c *diskqueueClient) Pop(ctx context1.Context, in *PopRequest, opts ...grpc1.CallOption) (*PopReply, error) {
@@ -851,7 +830,6 @@ func (c *diskqueueClient) Snapshot(ctx context1.Context, in *SnapshotRequest, op
 // DiskqueueServer is the server API for Diskqueue service.
 type DiskqueueServer interface {
 	Push(context1.Context, *PushRequest) (*PushReply, error)
-	MPush(Diskqueue_MPushServer) error
 	Pop(context1.Context, *PopRequest) (*PopReply, error)
 	Ack(context1.Context, *AckRequest) (*AckReply, error)
 	Join(context1.Context, *JoinRequest) (*JoinReply, error)
@@ -879,32 +857,6 @@ func _Diskqueue_Push_Handler(srv interface{}, ctx context1.Context, dec func(int
 		return srv.(DiskqueueServer).Push(ctx, req.(*PushRequest))
 	}
 	return interceptor(ctx, in, info, handler)
-}
-
-func _Diskqueue_MPush_Handler(srv interface{}, stream grpc1.ServerStream) error {
-	return srv.(DiskqueueServer).MPush(&diskqueueMPushServer{stream})
-}
-
-type Diskqueue_MPushServer interface {
-	SendAndClose(*PushReply) error
-	Recv() (*PushRequest, error)
-	grpc1.ServerStream
-}
-
-type diskqueueMPushServer struct {
-	grpc1.ServerStream
-}
-
-func (x *diskqueueMPushServer) SendAndClose(m *PushReply) error {
-	return x.ServerStream.SendMsg(m)
-}
-
-func (x *diskqueueMPushServer) Recv() (*PushRequest, error) {
-	m := new(PushRequest)
-	if err := x.ServerStream.RecvMsg(m); err != nil {
-		return nil, err
-	}
-	return m, nil
 }
 
 func _Diskqueue_Pop_Handler(srv interface{}, ctx context1.Context, dec func(interface{}) error, interceptor grpc1.UnaryServerInterceptor) (interface{}, error) {
@@ -1026,51 +978,45 @@ var _Diskqueue_serviceDesc = grpc1.ServiceDesc{
 			Handler:    _Diskqueue_Snapshot_Handler,
 		},
 	},
-	Streams: []grpc1.StreamDesc{
-		{
-			StreamName:    "MPush",
-			Handler:       _Diskqueue_MPush_Handler,
-			ClientStreams: true,
-		},
-	},
+	Streams:  []grpc1.StreamDesc{},
 	Metadata: "diskqueue.proto",
 }
 
-func init() { proto.RegisterFile("diskqueue.proto", fileDescriptor_diskqueue_ffd221efa8d42f73) }
+func init() { proto.RegisterFile("diskqueue.proto", fileDescriptor_diskqueue_776e86b699c54ecd) }
 
-var fileDescriptor_diskqueue_ffd221efa8d42f73 = []byte{
-	// 516 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x9c, 0x54, 0x4d, 0x6f, 0xda, 0x40,
-	0x10, 0xc5, 0x1f, 0xc4, 0xf6, 0x40, 0x43, 0x3a, 0x25, 0x89, 0x65, 0xf5, 0x80, 0x56, 0x6a, 0xc5,
-	0xa1, 0xe2, 0x00, 0x52, 0x95, 0x4a, 0xbd, 0xd0, 0xa2, 0xaa, 0x34, 0x8d, 0xb0, 0x36, 0xea, 0x0f,
-	0x70, 0xf1, 0x16, 0x2c, 0xb0, 0x77, 0xc3, 0x9a, 0x4a, 0xfc, 0x9a, 0xfe, 0xd5, 0xca, 0x6b, 0x1b,
-	0xdb, 0x09, 0xca, 0x21, 0x37, 0xcf, 0xec, 0xbc, 0x37, 0x33, 0x6f, 0x9e, 0x0c, 0xbd, 0x30, 0x92,
-	0x9b, 0x87, 0x3d, 0xdb, 0xb3, 0x91, 0xd8, 0xf1, 0x94, 0xa3, 0x73, 0x4c, 0x90, 0x5b, 0xb0, 0xee,
-	0x98, 0x94, 0xc1, 0x8a, 0xe1, 0x39, 0xe8, 0xf3, 0x99, 0xab, 0x0d, 0xb4, 0xa1, 0x49, 0xf5, 0xf9,
-	0x0c, 0x11, 0xcc, 0x30, 0x48, 0x03, 0x57, 0x1f, 0x68, 0xc3, 0x2e, 0x55, 0xdf, 0xf8, 0x16, 0x9c,
-	0x34, 0x8a, 0x99, 0x4c, 0x83, 0x58, 0xb8, 0xc6, 0x40, 0x1b, 0x1a, 0xb4, 0x4a, 0x90, 0x3d, 0x74,
-	0xfc, 0xbd, 0x5c, 0x53, 0xf6, 0xb0, 0x67, 0x32, 0xc5, 0x3e, 0xb4, 0x53, 0x2e, 0xa2, 0xa5, 0xe2,
-	0x74, 0x68, 0x1e, 0x9c, 0xa4, 0x75, 0xc1, 0x5a, 0x07, 0x72, 0x7d, 0xcb, 0x0e, 0x8a, 0xb4, 0x4b,
-	0xcb, 0x10, 0x09, 0x74, 0xa3, 0x55, 0xc2, 0x77, 0xec, 0x5b, 0xb4, 0x4d, 0xd9, 0xce, 0x35, 0x07,
-	0xda, 0xd0, 0xa6, 0x8d, 0x1c, 0xe9, 0x80, 0x93, 0xb7, 0x15, 0xdb, 0x03, 0xf9, 0x0c, 0xe0, 0x73,
-	0xf1, 0xfc, 0x08, 0x2e, 0x58, 0x09, 0x63, 0xe1, 0x74, 0xb9, 0x51, 0x53, 0xd8, 0xb4, 0x0c, 0xc9,
-	0x0d, 0xd8, 0x0a, 0x2d, 0xb6, 0x07, 0xfc, 0x00, 0x56, 0x9c, 0x4b, 0xa3, 0xd0, 0x9d, 0x31, 0x8e,
-	0x2a, 0x21, 0x0b, 0xd1, 0x68, 0x59, 0x42, 0x6e, 0x00, 0xa6, 0xcb, 0xcd, 0xf3, 0x7d, 0xfb, 0xd0,
-	0x8e, 0xe5, 0x6a, 0x3e, 0x53, 0x5d, 0x4d, 0x9a, 0x07, 0x04, 0xc0, 0x56, 0xc8, 0x6c, 0xfa, 0x29,
-	0x74, 0x7e, 0xf0, 0x28, 0x29, 0x69, 0x3c, 0xb0, 0x77, 0xc1, 0x9f, 0x74, 0x1a, 0x86, 0xbb, 0x82,
-	0xe9, 0x18, 0xe3, 0x15, 0x9c, 0x25, 0x3c, 0x64, 0x05, 0x9b, 0x43, 0x8b, 0x28, 0x53, 0x23, 0xa7,
-	0xc8, 0xf8, 0xde, 0x43, 0xf7, 0x27, 0x0b, 0xfe, 0xb2, 0x92, 0xb0, 0x02, 0x69, 0x0d, 0x50, 0x17,
-	0xa0, 0xa8, 0xcb, 0x50, 0xaf, 0xa1, 0x77, 0x9f, 0x04, 0x42, 0xae, 0x79, 0x5a, 0x00, 0x49, 0x0f,
-	0x5e, 0x55, 0xa9, 0xac, 0x46, 0x82, 0xf5, 0x95, 0xc7, 0x71, 0x90, 0x84, 0xf8, 0x0e, 0x74, 0x2e,
-	0x14, 0xe1, 0xf9, 0xf8, 0xb2, 0xa6, 0x51, 0xf1, 0x3e, 0x5a, 0x08, 0xaa, 0x73, 0x51, 0x69, 0xa2,
-	0x9f, 0xb2, 0x83, 0x51, 0xd9, 0x81, 0x5c, 0x83, 0xbe, 0x10, 0x68, 0x83, 0xe9, 0xff, 0xba, 0xff,
-	0x7e, 0xd1, 0x42, 0x0b, 0x0c, 0x7f, 0xe1, 0x5f, 0x68, 0xe3, 0x7f, 0x06, 0x38, 0xb3, 0x92, 0x1f,
-	0x3f, 0x82, 0x99, 0xdd, 0x1d, 0xaf, 0x6a, 0x3d, 0x6b, 0xfe, 0xf3, 0xfa, 0x4f, 0xf2, 0xd9, 0xe0,
-	0x2d, 0xfc, 0x04, 0xed, 0xbb, 0x97, 0x00, 0x87, 0x1a, 0x4e, 0xc0, 0xf0, 0xb9, 0xc0, 0xfa, 0x96,
-	0x95, 0xdb, 0xbc, 0x37, 0x8f, 0xd3, 0x79, 0xbf, 0x09, 0x18, 0xd3, 0xe5, 0xa6, 0x01, 0xaa, 0xac,
-	0xd2, 0x00, 0x1d, 0x7d, 0xd0, 0xca, 0x96, 0xcb, 0xce, 0xd8, 0x98, 0xb1, 0x66, 0x8d, 0xc6, 0x8c,
-	0xd5, 0xbd, 0xd5, 0x72, 0xea, 0x92, 0x78, 0x5d, 0x2b, 0xa8, 0x7b, 0xc0, 0xbb, 0x7c, 0xfa, 0x90,
-	0x43, 0xbf, 0x80, 0x5d, 0xde, 0x18, 0xbd, 0x5a, 0xd1, 0x23, 0x2f, 0x78, 0xee, 0xc9, 0x37, 0xc5,
-	0xf1, 0xfb, 0x4c, 0xfd, 0x61, 0x26, 0xff, 0x03, 0x00, 0x00, 0xff, 0xff, 0xec, 0xcb, 0xeb, 0x07,
-	0x74, 0x04, 0x00, 0x00,
+var fileDescriptor_diskqueue_776e86b699c54ecd = []byte{
+	// 528 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x94, 0x54, 0x4d, 0x6f, 0xd3, 0x40,
+	0x10, 0x8d, 0x1d, 0xa7, 0xb6, 0x27, 0xa1, 0x2d, 0x43, 0x5a, 0x2c, 0xc3, 0x21, 0xb2, 0x04, 0xca,
+	0x01, 0xe5, 0x90, 0x4a, 0xa8, 0x48, 0x5c, 0x4c, 0x03, 0x22, 0x7c, 0x35, 0xda, 0x0a, 0xee, 0x4b,
+	0xbc, 0x24, 0x56, 0x62, 0xef, 0xd6, 0x6b, 0x23, 0xe5, 0x37, 0xf1, 0xb7, 0xf8, 0x21, 0xc8, 0x6b,
+	0x3b, 0xb6, 0xdb, 0xa8, 0x12, 0xb7, 0xcc, 0xdb, 0x79, 0x6f, 0x9e, 0x67, 0x9e, 0x02, 0x27, 0x41,
+	0x28, 0x37, 0xb7, 0x19, 0xcb, 0xd8, 0x44, 0x24, 0x3c, 0xe5, 0x68, 0xef, 0x01, 0x8f, 0x81, 0xf9,
+	0x95, 0x49, 0x49, 0x57, 0x0c, 0x8f, 0x41, 0x9f, 0xcf, 0x1c, 0x6d, 0xa4, 0x8d, 0x0d, 0xa2, 0xcf,
+	0x67, 0x88, 0x60, 0x04, 0x34, 0xa5, 0x8e, 0x3e, 0xd2, 0xc6, 0x03, 0xa2, 0x7e, 0xa3, 0x03, 0xe6,
+	0x9a, 0xca, 0xf5, 0x67, 0xb6, 0x73, 0xba, 0x0a, 0xae, 0x4a, 0x7c, 0x0e, 0x76, 0x1a, 0x46, 0x4c,
+	0xa6, 0x34, 0x12, 0x8e, 0x31, 0xd2, 0xc6, 0x5d, 0x52, 0x03, 0x5e, 0x06, 0xfd, 0x45, 0x26, 0xd7,
+	0x84, 0xdd, 0x66, 0x4c, 0xa6, 0x38, 0x84, 0x5e, 0xca, 0x45, 0xb8, 0x54, 0xd3, 0x6c, 0x52, 0x14,
+	0xff, 0x39, 0xd0, 0x83, 0x41, 0xb8, 0x8a, 0x79, 0xc2, 0x3e, 0x84, 0xdb, 0x94, 0x25, 0x6a, 0xa6,
+	0x45, 0x5a, 0x98, 0xd7, 0x07, 0xbb, 0x18, 0x2b, 0xb6, 0x3b, 0xef, 0x2d, 0xc0, 0x82, 0x8b, 0x87,
+	0x2d, 0x38, 0x60, 0xc6, 0x8c, 0x05, 0xfe, 0x72, 0xa3, 0x5c, 0x58, 0xa4, 0x2a, 0xbd, 0x4b, 0xb0,
+	0x14, 0x5b, 0x6c, 0x77, 0xf8, 0x0a, 0xcc, 0xa8, 0x58, 0x9a, 0x62, 0xf7, 0xa7, 0x38, 0xa9, 0x57,
+	0x5c, 0xae, 0x93, 0x54, 0x2d, 0xde, 0x25, 0x80, 0xbf, 0xdc, 0x3c, 0x3c, 0x77, 0x08, 0xbd, 0x48,
+	0xae, 0xe6, 0x33, 0x35, 0xd5, 0x20, 0x45, 0xe1, 0x01, 0x58, 0x8a, 0x99, 0xbb, 0xf7, 0xa1, 0xff,
+	0x89, 0x87, 0x71, 0x25, 0xe3, 0x82, 0x95, 0xd0, 0x5f, 0xa9, 0x1f, 0x04, 0x49, 0xa9, 0xb4, 0xaf,
+	0xf1, 0x1c, 0x8e, 0x62, 0x1e, 0xb0, 0x52, 0xcd, 0x26, 0x65, 0x95, 0x6f, 0xa3, 0x90, 0xc8, 0xf5,
+	0x5e, 0xc2, 0xe0, 0x0b, 0xa3, 0xbf, 0x59, 0x25, 0x58, 0x93, 0xb4, 0x16, 0x69, 0x00, 0x50, 0xf6,
+	0xe5, 0xac, 0xc7, 0x70, 0x72, 0x13, 0x53, 0x21, 0xd7, 0x3c, 0x2d, 0x89, 0xde, 0x09, 0x3c, 0xaa,
+	0xa1, 0xbc, 0xe7, 0x8f, 0x06, 0xe6, 0x15, 0x8f, 0x22, 0x1a, 0x07, 0xf8, 0x02, 0x74, 0x2e, 0x94,
+	0xe2, 0xf1, 0xf4, 0xac, 0xb1, 0xa4, 0xf2, 0x7d, 0x72, 0x2d, 0x88, 0xce, 0x45, 0xbd, 0x14, 0xfd,
+	0x50, 0x1e, 0xba, 0x87, 0xf3, 0x60, 0xb4, 0xf3, 0xe0, 0x80, 0x99, 0x30, 0x1a, 0x2c, 0xb8, 0x74,
+	0x7a, 0x2a, 0x7e, 0x55, 0xe9, 0x3d, 0x03, 0xfd, 0x5a, 0xa0, 0x05, 0xc6, 0xe2, 0xfb, 0xcd, 0xc7,
+	0xd3, 0x0e, 0xf6, 0xc1, 0xf4, 0x67, 0x3f, 0xfc, 0x6f, 0x57, 0xef, 0x4f, 0xb5, 0xe9, 0x5f, 0x1d,
+	0xec, 0x59, 0xe5, 0x0b, 0x5f, 0x83, 0x91, 0x07, 0x06, 0xcf, 0x1b, 0x5e, 0x1b, 0xc1, 0x75, 0x87,
+	0xf7, 0xf0, 0xfc, 0x8b, 0x3b, 0x78, 0x01, 0xdd, 0x05, 0x17, 0xd8, 0xfc, 0xc4, 0x3a, 0x6b, 0xee,
+	0x93, 0xbb, 0xf0, 0x9e, 0xe4, 0x2f, 0x37, 0x2d, 0x52, 0x1d, 0x94, 0x16, 0x69, 0x9f, 0x82, 0x4e,
+	0xee, 0x30, 0x3f, 0x62, 0xcb, 0x61, 0x23, 0x18, 0x2d, 0x87, 0xf5, 0xb5, 0x3b, 0xf8, 0x06, 0x7a,
+	0xea, 0x8e, 0xf8, 0xb4, 0xd1, 0xd0, 0x4c, 0x80, 0x7b, 0x76, 0xff, 0xa1, 0xa0, 0xbe, 0x03, 0xab,
+	0xba, 0x30, 0xba, 0x8d, 0xa6, 0x3b, 0x49, 0x70, 0x9d, 0x83, 0x6f, 0x4a, 0xe3, 0xe7, 0x91, 0xfa,
+	0xe7, 0xb9, 0xf8, 0x17, 0x00, 0x00, 0xff, 0xff, 0x82, 0x42, 0xb5, 0x2a, 0x8c, 0x04, 0x00, 0x00,
 }

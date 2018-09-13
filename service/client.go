@@ -2,8 +2,6 @@ package service
 
 import (
 	"sync"
-
-	"github.com/tddhit/diskqueue/store"
 )
 
 type client struct {
@@ -24,9 +22,9 @@ func (c *client) getInflight(topic string) (*inflight, bool) {
 	return f, ok
 }
 
-func (c *client) getOrCreateInflight(t *store.Topic) *inflight {
+func (c *client) getOrCreateInflight(topic string, q queue) *inflight {
 	c.RLock()
-	f, ok := c.inflights[t.Name]
+	f, ok := c.inflights[topic]
 	if ok {
 		c.RUnlock()
 		return f
@@ -34,14 +32,14 @@ func (c *client) getOrCreateInflight(t *store.Topic) *inflight {
 	c.RUnlock()
 
 	c.Lock()
-	f, ok = c.inflights[t.Name]
+	f, ok = c.inflights[topic]
 	if ok {
 		c.Unlock()
 		return f
 
 	}
-	f = newInflight(t)
-	c.inflights[t.Name] = f
+	f = newInflight(topic, q)
+	c.inflights[topic] = f
 	c.Unlock()
 	return f
 }

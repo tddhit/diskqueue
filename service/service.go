@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"io"
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -13,25 +12,23 @@ import (
 	"google.golang.org/grpc/status"
 
 	pb "github.com/tddhit/diskqueue/pb"
-	"github.com/tddhit/diskqueue/store"
 )
 
 type queue interface {
-	Push(topic string, data []byte) error
-	Pop(topic string) *pb.Message
-	getTopic(name string) (*store.Topic, bool)
-	getOrCreateTopic(name string) *store.Topic
-	join(raftAddr, nodeID string) error
-	leave(nodeID string) error
-	snapshot() error
-	close() error
+	Push(topic string, data, hashKey []byte) error
+	Pop(topic string) (*pb.Message, error)
+	MayContain(topic string, key []byte) bool
+	HasTopic(topic string) bool
+	Join(raftAddr, nodeID string) error
+	Leave(nodeID string) error
+	Snapshot() error
+	Close() error
 }
 
 type Service struct {
 	sync.RWMutex
 	queue         queue
 	clients       map[string]*client
-	filters       map[string]*filter
 	dataDir       string
 	dl            *dirlock.DirLock
 	filterCounter *prometheus.CounterVec
@@ -56,7 +53,6 @@ func New(dataDir, mode, raftAddr, nodeID, leaderAddr string) *Service {
 	}
 	s := &Service{
 		queue:   q,
-		filters: make(map[string]*filter),
 		clients: make(map[string]*client),
 		dataDir: dataDir,
 		dl:      dirlock.New(dataDir),
@@ -78,81 +74,64 @@ func New(dataDir, mode, raftAddr, nodeID, leaderAddr string) *Service {
 func (s *Service) Push(ctx context.Context,
 	in *pb.PushRequest) (*pb.PushReply, error) {
 
-	filter := s.getOrCreateFilter(in.GetTopic())
 	if !in.GetIgnoreFilter() {
-		key := in.GetData()
+		hashKey := in.GetData()
 		if in.GetHashKey() != nil {
-			key = in.GetHashKey()
+			hashKey = in.GetHashKey()
 		}
-		if filter.mayContain(key) {
+		if s.queue.MayContain(in.GetTopic(), hashKey) {
 			s.filterCounter.WithLabelValues().Inc()
-			log.Debug("filter:", string(key))
+			log.Debug("filter:", string(hashKey))
 			return nil, status.Error(codes.AlreadyExists, "filter by bloom")
-		} else {
-			log.Debug("add:", string(key))
-			if err := filter.add(key); err != nil {
-				return nil, status.Error(codes.Internal, err.Error())
-			}
 		}
 	}
-	if err := s.queue.Push(in.Topic, in.Data); err != nil {
+	if err := s.queue.Push(in.GetTopic(),
+		in.GetData(), in.GetHashKey()); err != nil {
+
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	return &pb.PushReply{}, nil
 }
 
-func (s *Service) MPush(stream pb.Diskqueue_MPushServer) error {
-	for {
-		in, err := stream.Recv()
-		if err == io.EOF {
-			return stream.SendAndClose(&pb.PushReply{})
-		}
-		if err != nil {
-			log.Error(err)
-			return err
-		}
-		if err := s.queue.Push(in.Topic, in.Data); err != nil {
-			return status.Error(codes.Internal, err.Error())
-		}
-	}
-}
-
 func (s *Service) Pop(ctx context.Context,
 	in *pb.PopRequest) (*pb.PopReply, error) {
 
-	topic := s.queue.getOrCreateTopic(in.GetTopic())
-	var msg *pb.Message
+	var (
+		msg *pb.Message
+		err error
+	)
 	if in.GetNeedAck() {
 		client := ctx.Value("client").(*client)
-		inflight := client.getOrCreateInflight(topic)
+		inflight := client.getOrCreateInflight(in.GetTopic(), s.queue)
 		inflight.cond.L.Lock()
 		for inflight.full() {
 			inflight.cond.Wait()
 		}
-		msg = s.queue.Pop(in.GetTopic())
+		msg, err = s.queue.Pop(in.GetTopic())
+		if err != nil {
+			inflight.cond.L.Unlock()
+			return nil, err
+		}
 		inflight.push(msg)
 		inflight.cond.L.Unlock()
 	} else {
-		msg = s.queue.Pop(in.GetTopic())
+		msg, err = s.queue.Pop(in.GetTopic())
+		if err != nil {
+			return nil, err
+		}
 	}
-	if msg != nil {
-		return &pb.PopReply{
-			Message: msg,
-		}, nil
-	}
-	return nil, status.Error(codes.Unavailable, "msg is nil")
+	return &pb.PopReply{Message: msg}, nil
 }
 
 func (s *Service) Ack(ctx context.Context,
 	in *pb.AckRequest) (*pb.AckReply, error) {
 
 	client := ctx.Value("client").(*client)
-	topic, exist := s.queue.getTopic(in.GetTopic())
-	if !exist {
+	if !s.queue.HasTopic(in.GetTopic()) {
 		return nil, status.Error(codes.FailedPrecondition,
 			"not found topic in diskqueue")
 	}
-	inflight, exist := client.getInflight(topic.Name)
+	inflight, exist := client.getInflight(in.GetTopic())
 	if !exist {
 		return nil, status.Error(codes.FailedPrecondition,
 			"not found inflight in client")
@@ -166,7 +145,7 @@ func (s *Service) Ack(ctx context.Context,
 func (s *Service) Join(ctx context.Context,
 	in *pb.JoinRequest) (*pb.JoinReply, error) {
 
-	if err := s.queue.join(in.GetRaftAddr(), in.GetNodeID()); err != nil {
+	if err := s.queue.Join(in.GetRaftAddr(), in.GetNodeID()); err != nil {
 		return nil, err
 	}
 	return &pb.JoinReply{}, nil
@@ -175,7 +154,7 @@ func (s *Service) Join(ctx context.Context,
 func (s *Service) Leave(ctx context.Context,
 	in *pb.LeaveRequest) (*pb.LeaveReply, error) {
 
-	if err := s.queue.leave(in.GetNodeID()); err != nil {
+	if err := s.queue.Leave(in.GetNodeID()); err != nil {
 		return nil, err
 	}
 	return &pb.LeaveReply{}, nil
@@ -217,39 +196,10 @@ func (s *Service) getOrCreateClient(addr string) *client {
 	return client
 }
 
-func (s *Service) getFilter(topic string) (*filter, bool) {
-	s.RLock()
-	defer s.RUnlock()
-
-	f, ok := s.filters[topic]
-	return f, ok
-}
-
-func (s *Service) getOrCreateFilter(topic string) *filter {
-	s.RLock()
-	if f, ok := s.filters[topic]; ok {
-		s.RUnlock()
-		return f
-	}
-	s.RUnlock()
-
-	s.Lock()
-	if f, ok := s.filters[topic]; ok {
-		s.Unlock()
-		return f
-	}
-	filter, err := newFilter(s.dataDir, topic)
-	if err != nil {
-		log.Fatal(err)
-	}
-	s.filters[topic] = filter
-	s.Unlock()
-	return filter
-}
-
 func (s *Service) Close() {
+	log.Debug("Close")
 	s.Lock()
 	defer s.Unlock()
 
-	s.queue.close()
+	s.queue.Close()
 }

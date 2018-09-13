@@ -20,57 +20,33 @@ var (
 
 type clusterStore struct {
 	sync.RWMutex
+	*store.Queue
 	raftNode *cluster.RaftNode
-	ss       *standaloneStore
-	conds    map[string]*sync.Cond
 }
 
 func newClusterStore(dataDir, raftAddr string,
 	nodeID, leaderAddr string) (*clusterStore, error) {
 
-	ss := newStandaloneStore(dataDir)
-	node, err := cluster.NewRaftNode(dataDir, raftAddr, nodeID, leaderAddr, ss)
+	queue := store.NewQueue(dataDir)
+	node, err := cluster.NewRaftNode(dataDir, raftAddr, nodeID, leaderAddr, queue)
 	if err != nil {
 		return nil, err
 	}
 	return &clusterStore{
+		Queue:    queue,
 		raftNode: node,
-		ss:       ss,
-		conds:    make(map[string]*sync.Cond),
 	}, nil
 }
 
-func (s *clusterStore) getOrCreateCond(topic string) *sync.Cond {
-	s.RLock()
-	cond, ok := s.conds[topic]
-	if ok {
-		s.RUnlock()
-		return cond
-	}
-	s.RUnlock()
-
-	s.Lock()
-	cond, ok = s.conds[topic]
-	if ok {
-		s.Unlock()
-		return cond
-	}
-	cond = sync.NewCond(&sync.Mutex{})
-	s.conds[topic] = cond
-	s.Unlock()
-	return cond
-}
-
-func (s *clusterStore) Push(topic string, data []byte) error {
+func (s *clusterStore) Push(topic string, data, hashKey []byte) error {
 	if s.raftNode.State() != raft.Leader {
 		return errNotLeader
 	}
-	cond := s.getOrCreateCond(topic)
-	cond.Signal()
 	cmd, err := proto.Marshal(&pb.Command{
-		Topic: topic,
-		Data:  data,
-		Op:    pb.Command_PUSH,
+		Op:      pb.Command_PUSH,
+		Topic:   topic,
+		Data:    data,
+		HashKey: hashKey,
 	})
 	if err != nil {
 		log.Error(err)
@@ -80,43 +56,33 @@ func (s *clusterStore) Push(topic string, data []byte) error {
 	return f.Error()
 }
 
-func (s *clusterStore) Pop(topic string) *pb.Message {
+func (s *clusterStore) Pop(topic string) (*pb.Message, error) {
 	if s.raftNode.State() != raft.Leader {
-		return nil
+		return nil, errNotLeader
 	}
-	cond := s.getOrCreateCond(topic)
-	t := s.getOrCreateTopic(topic)
-	cond.L.Lock()
-	for t.Empty() {
-		cond.Wait()
+	s.Lock()
+	defer s.Unlock()
+
+	msg, pos, err := s.GetMessage(topic)
+	if err != nil {
+		return nil, err
 	}
-	cond.L.Unlock()
 	cmd, err := proto.Marshal(&pb.Command{
-		Topic: topic,
-		Op:    pb.Command_POP,
+		Op:      pb.Command_ADVANCE,
+		Topic:   topic,
+		ReadPos: pos,
 	})
 	if err != nil {
-		log.Error(err)
-		return nil
+		return nil, err
 	}
 	f := s.raftNode.Apply(cmd, 10*time.Second)
-	log.Debug("pop...")
 	if err := f.Error(); err != nil {
-		return nil
+		return nil, err
 	}
-	log.Debug("pop...end")
-	return f.Response().(*pb.Message)
+	return msg, nil
 }
 
-func (s *clusterStore) getTopic(name string) (*store.Topic, bool) {
-	return s.ss.getTopic(name)
-}
-
-func (s *clusterStore) getOrCreateTopic(name string) *store.Topic {
-	return s.ss.getOrCreateTopic(name)
-}
-
-func (s *clusterStore) join(raftAddr, nodeID string) error {
+func (s *clusterStore) Join(raftAddr, nodeID string) error {
 	config := s.raftNode.GetConfiguration()
 	if err := config.Error(); err != nil {
 		log.Error(err)
@@ -135,7 +101,7 @@ func (s *clusterStore) join(raftAddr, nodeID string) error {
 	return nil
 }
 
-func (s *clusterStore) leave(nodeID string) error {
+func (s *clusterStore) Leave(nodeID string) error {
 	config := s.raftNode.GetConfiguration()
 	if err := config.Error(); err != nil {
 		return err
@@ -153,12 +119,13 @@ func (s *clusterStore) leave(nodeID string) error {
 	return nil
 }
 
-func (s *clusterStore) snapshot() error {
+func (s *clusterStore) Snapshot() error {
 	return nil
 }
 
-func (s *clusterStore) close() error {
+func (s *clusterStore) Close() error {
+	log.Debug("Close")
 	s.raftNode.Close()
-	s.ss.close()
+	s.Queue.Close()
 	return nil
 }

@@ -31,10 +31,11 @@ type Topic struct {
 	dataDir string
 	meta    tmeta
 
-	curSeg *segment
-	segs   segments
+	filter   *filter
+	readSeg  *segment
+	writeSeg *segment
+	segs     segments
 
-	readC     chan *pb.Message
 	writeC    chan *pb.Message
 	writeRspC chan error
 
@@ -52,7 +53,6 @@ func NewTopic(dataDir, topic string) (*Topic, error) {
 		Name:    topic,
 		dataDir: dataDir,
 
-		readC:     make(chan *pb.Message),
 		writeC:    make(chan *pb.Message),
 		writeRspC: make(chan error),
 
@@ -61,6 +61,11 @@ func NewTopic(dataDir, topic string) (*Topic, error) {
 
 		exitC: make(chan struct{}),
 	}
+	filter, err := newFilter(dataDir, topic)
+	if err != nil {
+		return nil, err
+	}
+	t.filter = filter
 	if err := t.loadMetadata(); err != nil {
 		if !os.IsNotExist(err) {
 			return nil, err
@@ -74,14 +79,13 @@ func NewTopic(dataDir, topic string) (*Topic, error) {
 		t.meta.Segments = append(t.meta.Segments, meta)
 		t.sync()
 	}
+	t.readSeg, err = t.seek(t.meta.ReadID)
+	if err != nil {
+		return nil, err
+	}
 	t.wg.Add(1)
 	go func() {
 		t.writeLoop()
-		t.wg.Done()
-	}()
-	t.wg.Add(1)
-	go func() {
-		t.readLoop()
 		t.wg.Done()
 	}()
 	t.wg.Add(1)
@@ -92,11 +96,7 @@ func NewTopic(dataDir, topic string) (*Topic, error) {
 	return t, nil
 }
 
-func (t *Topic) Empty() bool {
-	return atomic.LoadUint64(&t.meta.ReadID) == atomic.LoadUint64(&t.meta.WriteID)
-}
-
-func (t *Topic) PutMessage(data []byte) error {
+func (t *Topic) push(data []byte) error {
 	t.RLock()
 	defer t.RUnlock()
 
@@ -107,8 +107,44 @@ func (t *Topic) PutMessage(data []byte) error {
 	return <-t.writeRspC
 }
 
-func (t *Topic) GetMessage() *pb.Message {
-	return <-t.readC
+func (t *Topic) get() (*pb.Message, int64, error) {
+	var (
+		msg *pb.Message
+		err error
+		pos int64
+	)
+	for {
+		if atomic.LoadInt32(&t.exitFlag) == 1 {
+			return nil, 0, errors.New("diskqueue already close")
+		}
+		if t.readSeg == nil {
+			t.readSeg, err = t.seek(t.meta.ReadID)
+			if err != nil {
+				log.Fatal(err)
+			}
+		}
+		if t.meta.ReadID < atomic.LoadUint64(&t.meta.WriteID) {
+			if t.meta.ReadID < atomic.LoadUint64(&t.readSeg.meta.WriteID) {
+				msg, pos, err = t.readSeg.readOne(t.meta.ReadID)
+				if err != nil {
+					log.Fatal(err)
+				}
+			} else {
+				t.readSeg = nil
+				continue
+			}
+		} else {
+			runtime.Gosched()
+			continue
+		}
+		return msg, pos, nil
+	}
+}
+
+func (t *Topic) advance(pos int64) {
+	t.meta.ReadID++
+	t.readSeg.meta.ReadID++
+	t.readSeg.meta.ReadPos = pos
 }
 
 func (t *Topic) seek(msgID uint64) (*segment, error) {
@@ -132,12 +168,12 @@ func (t *Topic) createSegment(mode int, meta *smeta) error {
 		return err
 	}
 	t.segs = append(t.segs, seg)
-	t.curSeg = seg
+	t.writeSeg = seg
 	return nil
 }
 
 func (t *Topic) writeOne(msg *pb.Message) error {
-	if t.curSeg.full() {
+	if t.writeSeg.full() {
 		meta := &smeta{
 			MinID:   msg.ID,
 			ReadID:  msg.ID,
@@ -149,7 +185,7 @@ func (t *Topic) writeOne(msg *pb.Message) error {
 		t.meta.Segments = append(t.meta.Segments, meta)
 		t.sync()
 	}
-	if err := t.curSeg.writeOne(msg); err != nil {
+	if err := t.writeSeg.writeOne(msg); err != nil {
 		return err
 	}
 	atomic.AddUint64(&t.meta.WriteID, 1)
@@ -183,51 +219,6 @@ func (t *Topic) writeLoop() {
 	}
 exit:
 	log.Infof("diskqueue(%s) exit writeLoop.", t.Name)
-}
-
-func (t *Topic) readLoop() {
-	var (
-		msg *pb.Message
-		seg *segment
-		pos int64
-		err error
-	)
-	for {
-		if atomic.LoadInt32(&t.exitFlag) == 1 {
-			goto exit
-		}
-		if seg == nil {
-			seg, err = t.seek(t.meta.ReadID)
-			if err != nil {
-				log.Fatal(err)
-			}
-		}
-		if t.meta.ReadID < atomic.LoadUint64(&t.meta.WriteID) {
-			if t.meta.ReadID < atomic.LoadUint64(&seg.meta.WriteID) {
-				msg, pos, err = seg.readOne(t.meta.ReadID)
-				if err != nil {
-					log.Fatal(err)
-				}
-			} else {
-				seg = nil
-				continue
-			}
-		} else {
-			runtime.Gosched()
-			continue
-		}
-		select {
-		case t.readC <- msg:
-			t.meta.ReadID++
-			seg.meta.ReadID++
-			seg.meta.ReadPos = pos
-		case <-t.exitC:
-			goto exit
-		}
-	}
-exit:
-	close(t.readC)
-	log.Infof("topic(%s) exit readLoop.", t.Name)
 }
 
 func (t *Topic) recycleLoop() {
@@ -295,6 +286,7 @@ func (t *Topic) loadMetadata() error {
 }
 
 func (t *Topic) Close() error {
+	log.Debug("Close")
 	t.Lock()
 	defer t.Unlock()
 

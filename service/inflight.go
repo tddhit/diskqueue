@@ -10,7 +10,6 @@ import (
 	"github.com/tddhit/tools/log"
 
 	pb "github.com/tddhit/diskqueue/pb"
-	"github.com/tddhit/diskqueue/store"
 )
 
 const (
@@ -19,7 +18,8 @@ const (
 
 type inflight struct {
 	sync.RWMutex
-	topic   *store.Topic
+	topic   string
+	queue   queue
 	pqueue  *pqueue
 	m       map[uint64]*pb.Message
 	cond    *sync.Cond
@@ -27,9 +27,10 @@ type inflight struct {
 	exitC   chan struct{}
 }
 
-func newInflight(t *store.Topic) *inflight {
+func newInflight(topic string, q queue) *inflight {
 	f := &inflight{
-		topic:   t,
+		topic:   topic,
+		queue:   q,
 		pqueue:  &pqueue{},
 		m:       make(map[uint64]*pb.Message, maxInflight),
 		cond:    sync.NewCond(&sync.Mutex{}),
@@ -64,7 +65,7 @@ func (f *inflight) process() {
 		}
 		if msg != nil {
 			log.Info("requeue", msg.GetID())
-			f.topic.PutMessage(msg.GetData())
+			f.queue.Push(f.topic, msg.GetData(), msg.GetHashKey())
 		}
 	}
 }

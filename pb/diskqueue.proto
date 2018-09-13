@@ -4,7 +4,6 @@ package diskqueue;
 
 service Diskqueue {
     rpc Push     (PushRequest)         returns (PushReply)    {}
-    rpc MPush    (stream PushRequest)  returns (PushReply)    {}
     rpc Pop      (PopRequest)          returns (PopReply)     {}
     rpc Ack      (AckRequest)          returns (AckReply)     {}
     rpc Join     (JoinRequest)         returns (JoinReply)    {}
@@ -15,7 +14,8 @@ service Diskqueue {
 message Message {
     uint64  ID   = 1;
     bytes   data = 2;
-    int64   timestamp = 3;
+    bytes   hashKey = 3;
+    int64   timestamp = 4;
 }
 
 message PushRequest {
@@ -70,9 +70,11 @@ message SnapshotReply {
 message Command {
     enum Op {
         PUSH = 0;          
-        POP = 1;
+        ADVANCE = 1;
     }
     Op op = 1;
     string topic = 2;
     bytes data = 3;
+    bytes hashKey = 4;
+    int64 readPos = 5;
 }

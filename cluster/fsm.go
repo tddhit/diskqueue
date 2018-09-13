@@ -11,8 +11,8 @@ import (
 )
 
 type queue interface {
-	Push(topic string, data []byte) error
-	Pop(topic string) *pb.Message
+	Push(topic string, data, hashKey []byte) error
+	Advance(topic string, pos int64)
 }
 
 type fsm struct {
@@ -32,9 +32,9 @@ func (f *fsm) Apply(l *raft.Log) interface{} {
 	}
 	switch cmd.Op {
 	case pb.Command_PUSH:
-		return f.queue.Push(cmd.Topic, cmd.Data)
-	case pb.Command_POP:
-		return f.queue.Pop(cmd.Topic)
+		return f.queue.Push(cmd.GetTopic(), cmd.GetData(), cmd.GetHashKey())
+	case pb.Command_ADVANCE:
+		f.queue.Advance(cmd.GetTopic(), cmd.GetReadPos())
 	default:
 		log.Panic("Invalid Op")
 	}
