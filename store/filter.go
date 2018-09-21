@@ -36,9 +36,9 @@ type fmeta struct {
 
 type filter struct {
 	sync.RWMutex
-	name     string
-	dataPath string
-	meta     fmeta
+	name    string
+	dataDir string
+	meta    fmeta
 
 	cur    *bloom.Bloom
 	blooms []*bloom.Bloom
@@ -47,12 +47,16 @@ type filter struct {
 	exitC chan struct{}
 }
 
-func newFilter(dataPath, topic string) (*filter, error) {
+func newFilter(dataDir, topic string) (*filter, error) {
 	f := &filter{
-		name:     topic,
-		dataPath: dataPath,
+		name:    topic,
+		dataDir: path.Join(dataDir, topic, "bloom"),
 
 		exitC: make(chan struct{}),
+	}
+	if err := os.MkdirAll(f.dataDir, 0755); err != nil && !os.IsExist(err) {
+		log.Error(err)
+		return nil, err
 	}
 	if err := f.loadMetadata(); err != nil {
 		if !os.IsNotExist(err) {
@@ -90,7 +94,7 @@ func newFilter(dataPath, topic string) (*filter, error) {
 }
 
 func (f *filter) loadMetadata() error {
-	filename := fmt.Sprintf(path.Join(f.dataPath, "%s.bloom.meta"), f.name)
+	filename := fmt.Sprintf(path.Join(f.dataDir, "%s.bloom.meta"), f.name)
 	file, err := os.Open(filename)
 	if err != nil {
 		return err
@@ -108,7 +112,7 @@ func (f *filter) loadMetadata() error {
 }
 
 func (f *filter) createBloom(meta *bmeta) error {
-	file := fmt.Sprintf(path.Join(f.dataPath, "%s.bloom.%d.dat"),
+	file := fmt.Sprintf(path.Join(f.dataDir, "%s.bloom.%d.dat"),
 		f.name, meta.CreateTime)
 	bloom, err := bloom.New(maxNumElements, falsePostive,
 		bloom.WithMmap(file, maxMmapSize))
@@ -254,7 +258,7 @@ func (f *filter) sync() error {
 }
 
 func (f *filter) persistMetadata() error {
-	filename := fmt.Sprintf(path.Join(f.dataPath, "%s.bloom.meta"), f.name)
+	filename := fmt.Sprintf(path.Join(f.dataDir, "%s.bloom.meta"), f.name)
 	tmpFilename := fmt.Sprintf("%s.%d.tmp", filename, rand.Int())
 	file, err := os.OpenFile(tmpFilename, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
 	if err != nil {

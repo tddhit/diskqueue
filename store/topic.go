@@ -25,7 +25,7 @@ type tmeta struct {
 	Segments []*smeta `json:"segments"`
 }
 
-type Topic struct {
+type topic struct {
 	sync.RWMutex
 	Name    string
 	dataDir string
@@ -48,10 +48,10 @@ type Topic struct {
 	wg       sync.WaitGroup
 }
 
-func NewTopic(dataDir, topic string) (*Topic, error) {
-	t := &Topic{
-		Name:    topic,
-		dataDir: dataDir,
+func newTopic(dataDir, name string) (*topic, error) {
+	t := &topic{
+		Name:    name,
+		dataDir: path.Join(dataDir, name, "data"),
 
 		writeC:    make(chan *pb.Message),
 		writeRspC: make(chan error),
@@ -61,7 +61,11 @@ func NewTopic(dataDir, topic string) (*Topic, error) {
 
 		exitC: make(chan struct{}),
 	}
-	filter, err := newFilter(dataDir, topic)
+	if err := os.MkdirAll(t.dataDir, 0755); err != nil && !os.IsExist(err) {
+		log.Error(err)
+		return nil, err
+	}
+	filter, err := newFilter(dataDir, name)
 	if err != nil {
 		return nil, err
 	}
@@ -96,7 +100,7 @@ func NewTopic(dataDir, topic string) (*Topic, error) {
 	return t, nil
 }
 
-func (t *Topic) push(data []byte) error {
+func (t *topic) push(data []byte) error {
 	t.RLock()
 	defer t.RUnlock()
 
@@ -107,7 +111,7 @@ func (t *Topic) push(data []byte) error {
 	return <-t.writeRspC
 }
 
-func (t *Topic) get() (*pb.Message, int64, error) {
+func (t *topic) get() (*pb.Message, int64, error) {
 	var (
 		msg *pb.Message
 		err error
@@ -141,13 +145,13 @@ func (t *Topic) get() (*pb.Message, int64, error) {
 	}
 }
 
-func (t *Topic) advance(pos int64) {
+func (t *topic) advance(pos int64) {
 	t.meta.ReadID++
 	t.readSeg.meta.ReadID++
 	t.readSeg.meta.ReadPos = pos
 }
 
-func (t *Topic) seek(msgID uint64) (*segment, error) {
+func (t *topic) seek(msgID uint64) (*segment, error) {
 	if len(t.segs) == 0 {
 		return nil, errors.New("empty segments")
 	}
@@ -160,7 +164,7 @@ func (t *Topic) seek(msgID uint64) (*segment, error) {
 	return t.segs[index-1], nil
 }
 
-func (t *Topic) createSegment(mode int, meta *smeta) error {
+func (t *topic) createSegment(mode int, meta *smeta) error {
 	file := fmt.Sprintf(path.Join(t.dataDir, "%s.diskqueue.%d.dat"),
 		t.Name, meta.MinID)
 	seg, err := newSegment(file, mode, mmap.SEQUENTIAL, meta)
@@ -172,7 +176,7 @@ func (t *Topic) createSegment(mode int, meta *smeta) error {
 	return nil
 }
 
-func (t *Topic) writeOne(msg *pb.Message) error {
+func (t *topic) writeOne(msg *pb.Message) error {
 	if t.writeSeg.full() {
 		meta := &smeta{
 			MinID:   msg.ID,
@@ -193,7 +197,7 @@ func (t *Topic) writeOne(msg *pb.Message) error {
 	return nil
 }
 
-func (t *Topic) writeLoop() {
+func (t *topic) writeLoop() {
 	var count int
 	syncTicker := time.NewTicker(t.syncInterval)
 	for {
@@ -221,7 +225,7 @@ exit:
 	log.Infof("diskqueue(%s) exit writeLoop.", t.Name)
 }
 
-func (t *Topic) recycleLoop() {
+func (t *topic) recycleLoop() {
 	ticker := time.NewTicker(time.Hour)
 	for {
 		select {
@@ -244,7 +248,7 @@ exit:
 	ticker.Stop()
 }
 
-func (t *Topic) persistMetadata() error {
+func (t *topic) persistMetadata() error {
 	filename := fmt.Sprintf(path.Join(t.dataDir, "%s.diskqueue.meta"), t.Name)
 	tmpFilename := fmt.Sprintf("%s.%d.tmp", filename, rand.Int())
 	f, err := os.OpenFile(tmpFilename, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
@@ -261,7 +265,7 @@ func (t *Topic) persistMetadata() error {
 	return os.Rename(tmpFilename, filename)
 }
 
-func (t *Topic) loadMetadata() error {
+func (t *topic) loadMetadata() error {
 	filename := fmt.Sprintf(path.Join(t.dataDir, "%s.diskqueue.meta"), t.Name)
 	f, err := os.Open(filename)
 	if err != nil {
@@ -285,7 +289,7 @@ func (t *Topic) loadMetadata() error {
 	return nil
 }
 
-func (t *Topic) Close() error {
+func (t *topic) Close() error {
 	log.Debug("Close")
 	t.Lock()
 	defer t.Unlock()
@@ -304,7 +308,7 @@ func (t *Topic) Close() error {
 	return nil
 }
 
-func (t *Topic) sync() error {
+func (t *topic) sync() error {
 	for _, seg := range t.segs {
 		if err := seg.sync(); err != nil {
 			return err

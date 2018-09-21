@@ -3,6 +3,7 @@ package cluster
 import (
 	"context"
 	"net"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -23,7 +24,10 @@ func NewRaftNode(dir, addr, id, leaderAddr string, q queue) (*RaftNode, error) {
 	config := raft.DefaultConfig()
 	config.LocalID = raft.ServerID(id)
 	fsm := newFSM(q)
-	boltdb, err := raftboltdb.NewBoltStore(filepath.Join(dir, id))
+	if err := os.MkdirAll(filepath.Join(dir, "wal"), 0755); err != nil {
+		return nil, err
+	}
+	boltdb, err := raftboltdb.NewBoltStore(filepath.Join(dir, "wal", id+".log"))
 	if err != nil {
 		return nil, err
 	}

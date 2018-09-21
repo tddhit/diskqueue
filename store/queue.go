@@ -13,13 +13,13 @@ import (
 type Queue struct {
 	sync.RWMutex
 	dataDir string
-	topics  map[string]*Topic
+	topics  map[string]*topic
 }
 
 func NewQueue(dataDir string) *Queue {
 	return &Queue{
 		dataDir: dataDir,
-		topics:  make(map[string]*Topic),
+		topics:  make(map[string]*topic),
 	}
 }
 
@@ -57,7 +57,7 @@ func (s *Queue) Advance(topic string, pos int64) {
 	t.advance(pos)
 }
 
-func (s *Queue) GetTopic(name string) (*Topic, bool) {
+func (s *Queue) GetTopic(name string) (*topic, bool) {
 	s.RLock()
 	defer s.RUnlock()
 
@@ -65,7 +65,7 @@ func (s *Queue) GetTopic(name string) (*Topic, bool) {
 	return t, ok
 }
 
-func (s *Queue) GetOrCreateTopic(name string) *Topic {
+func (s *Queue) GetOrCreateTopic(name string) *topic {
 	s.RLock()
 	if t, ok := s.topics[name]; ok {
 		s.RUnlock()
@@ -78,7 +78,7 @@ func (s *Queue) GetOrCreateTopic(name string) *Topic {
 		s.Unlock()
 		return t
 	}
-	topic, err := NewTopic(s.dataDir, name)
+	topic, err := newTopic(s.dataDir, name)
 	if err != nil {
 		log.Fatal(err)
 	}
