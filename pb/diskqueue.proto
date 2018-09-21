@@ -3,12 +3,15 @@ syntax = "proto3";
 package diskqueue;
 
 service Diskqueue {
-    rpc Push     (PushRequest)         returns (PushReply)    {}
-    rpc Pop      (PopRequest)          returns (PopReply)     {}
-    rpc Ack      (AckRequest)          returns (AckReply)     {}
-    rpc Join     (JoinRequest)         returns (JoinReply)    {}
-    rpc Leave    (LeaveRequest)        returns (LeaveReply)   {}
-    rpc Snapshot (SnapshotRequest)     returns (SnapshotReply){}
+    rpc Push        (PushRequest)               returns (PushReply)                 {}
+    rpc Pop         (PopRequest)                returns (PopReply)                  {}
+    rpc Ack         (AckRequest)                returns (AckReply)                  {}
+    rpc Join        (JoinRequest)               returns (JoinReply)                 {}
+    rpc Leave       (LeaveRequest)              returns (LeaveReply)                {}
+    rpc Snapshot    (SnapshotRequest)           returns (SnapshotReply)             {}
+    //rpc KeepAlive   (stream KeepAliveRequest)   returns (stream KeepAliveReply)     {}
+    rpc GetState    (GetStateRequest)           returns (GetStateReply)             {}
+    rpc WatchState  (WatchStateRequest)         returns (stream WatchStateReply)    {}
 }
 
 message Message {
@@ -77,4 +80,24 @@ message Command {
     bytes data = 3;
     bytes hashKey = 4;
     int64 readPos = 5;
+}
+
+message KeepAliveRequest {
+}
+
+message KeepAliveReply {
+}
+
+message GetStateRequest {
+}
+
+message GetStateReply {
+    uint32 state = 1;
+}
+
+message WatchStateRequest {
+}
+
+message WatchStateReply {
+    uint32 state = 1;
 }

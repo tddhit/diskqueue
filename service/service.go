@@ -22,6 +22,7 @@ type queue interface {
 	Join(raftAddr, nodeID string) error
 	Leave(nodeID string) error
 	Snapshot() error
+	GetState() uint32
 	Close() error
 }
 
@@ -164,6 +165,24 @@ func (s *Service) Snapshot(ctx context.Context,
 	in *pb.SnapshotRequest) (*pb.SnapshotReply, error) {
 
 	return nil, nil
+}
+
+func (s *Service) GetState(ctx context.Context,
+	in *pb.GetStateRequest) (*pb.GetStateReply, error) {
+
+	return &pb.GetStateReply{State: s.queue.GetState()}, nil
+}
+
+func (s *Service) WatchState(in *pb.WatchStateRequest,
+	stream pb.Diskqueue_WatchStateServer) error {
+
+	for {
+		err := stream.Send(&pb.WatchStateReply{State: s.queue.GetState()})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *Service) getClient(addr string) (*client, bool) {

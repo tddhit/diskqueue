@@ -40,6 +40,10 @@ func (s *standaloneStore) Snapshot() error {
 	return nil
 }
 
+func (s *standaloneStore) GetState() uint32 {
+	return 0
+}
+
 func (s *standaloneStore) Close() error {
 	return nil
 }

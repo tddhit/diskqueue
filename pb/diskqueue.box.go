@@ -50,7 +50,7 @@ func (x Command_Op) String() string {
 	return proto.EnumName(Command_Op_name, int32(x))
 }
 func (Command_Op) EnumDescriptor() ([]byte, []int) {
-	return fileDescriptor_diskqueue_776e86b699c54ecd, []int{13, 0}
+	return fileDescriptor_diskqueue_4700a647b0f7ddf4, []int{13, 0}
 }
 
 type Message struct {
@@ -67,7 +67,7 @@ func (m *Message) Reset()         { *m = Message{} }
 func (m *Message) String() string { return proto.CompactTextString(m) }
 func (*Message) ProtoMessage()    {}
 func (*Message) Descriptor() ([]byte, []int) {
-	return fileDescriptor_diskqueue_776e86b699c54ecd, []int{0}
+	return fileDescriptor_diskqueue_4700a647b0f7ddf4, []int{0}
 }
 func (m *Message) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Message.Unmarshal(m, b)
@@ -129,7 +129,7 @@ func (m *PushRequest) Reset()         { *m = PushRequest{} }
 func (m *PushRequest) String() string { return proto.CompactTextString(m) }
 func (*PushRequest) ProtoMessage()    {}
 func (*PushRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_diskqueue_776e86b699c54ecd, []int{1}
+	return fileDescriptor_diskqueue_4700a647b0f7ddf4, []int{1}
 }
 func (m *PushRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_PushRequest.Unmarshal(m, b)
@@ -187,7 +187,7 @@ func (m *PushReply) Reset()         { *m = PushReply{} }
 func (m *PushReply) String() string { return proto.CompactTextString(m) }
 func (*PushReply) ProtoMessage()    {}
 func (*PushReply) Descriptor() ([]byte, []int) {
-	return fileDescriptor_diskqueue_776e86b699c54ecd, []int{2}
+	return fileDescriptor_diskqueue_4700a647b0f7ddf4, []int{2}
 }
 func (m *PushReply) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_PushReply.Unmarshal(m, b)
@@ -219,7 +219,7 @@ func (m *PopRequest) Reset()         { *m = PopRequest{} }
 func (m *PopRequest) String() string { return proto.CompactTextString(m) }
 func (*PopRequest) ProtoMessage()    {}
 func (*PopRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_diskqueue_776e86b699c54ecd, []int{3}
+	return fileDescriptor_diskqueue_4700a647b0f7ddf4, []int{3}
 }
 func (m *PopRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_PopRequest.Unmarshal(m, b)
@@ -264,7 +264,7 @@ func (m *PopReply) Reset()         { *m = PopReply{} }
 func (m *PopReply) String() string { return proto.CompactTextString(m) }
 func (*PopReply) ProtoMessage()    {}
 func (*PopReply) Descriptor() ([]byte, []int) {
-	return fileDescriptor_diskqueue_776e86b699c54ecd, []int{4}
+	return fileDescriptor_diskqueue_4700a647b0f7ddf4, []int{4}
 }
 func (m *PopReply) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_PopReply.Unmarshal(m, b)
@@ -303,7 +303,7 @@ func (m *AckRequest) Reset()         { *m = AckRequest{} }
 func (m *AckRequest) String() string { return proto.CompactTextString(m) }
 func (*AckRequest) ProtoMessage()    {}
 func (*AckRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_diskqueue_776e86b699c54ecd, []int{5}
+	return fileDescriptor_diskqueue_4700a647b0f7ddf4, []int{5}
 }
 func (m *AckRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_AckRequest.Unmarshal(m, b)
@@ -347,7 +347,7 @@ func (m *AckReply) Reset()         { *m = AckReply{} }
 func (m *AckReply) String() string { return proto.CompactTextString(m) }
 func (*AckReply) ProtoMessage()    {}
 func (*AckReply) Descriptor() ([]byte, []int) {
-	return fileDescriptor_diskqueue_776e86b699c54ecd, []int{6}
+	return fileDescriptor_diskqueue_4700a647b0f7ddf4, []int{6}
 }
 func (m *AckReply) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_AckReply.Unmarshal(m, b)
@@ -379,7 +379,7 @@ func (m *JoinRequest) Reset()         { *m = JoinRequest{} }
 func (m *JoinRequest) String() string { return proto.CompactTextString(m) }
 func (*JoinRequest) ProtoMessage()    {}
 func (*JoinRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_diskqueue_776e86b699c54ecd, []int{7}
+	return fileDescriptor_diskqueue_4700a647b0f7ddf4, []int{7}
 }
 func (m *JoinRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_JoinRequest.Unmarshal(m, b)
@@ -423,7 +423,7 @@ func (m *JoinReply) Reset()         { *m = JoinReply{} }
 func (m *JoinReply) String() string { return proto.CompactTextString(m) }
 func (*JoinReply) ProtoMessage()    {}
 func (*JoinReply) Descriptor() ([]byte, []int) {
-	return fileDescriptor_diskqueue_776e86b699c54ecd, []int{8}
+	return fileDescriptor_diskqueue_4700a647b0f7ddf4, []int{8}
 }
 func (m *JoinReply) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_JoinReply.Unmarshal(m, b)
@@ -454,7 +454,7 @@ func (m *LeaveRequest) Reset()         { *m = LeaveRequest{} }
 func (m *LeaveRequest) String() string { return proto.CompactTextString(m) }
 func (*LeaveRequest) ProtoMessage()    {}
 func (*LeaveRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_diskqueue_776e86b699c54ecd, []int{9}
+	return fileDescriptor_diskqueue_4700a647b0f7ddf4, []int{9}
 }
 func (m *LeaveRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_LeaveRequest.Unmarshal(m, b)
@@ -491,7 +491,7 @@ func (m *LeaveReply) Reset()         { *m = LeaveReply{} }
 func (m *LeaveReply) String() string { return proto.CompactTextString(m) }
 func (*LeaveReply) ProtoMessage()    {}
 func (*LeaveReply) Descriptor() ([]byte, []int) {
-	return fileDescriptor_diskqueue_776e86b699c54ecd, []int{10}
+	return fileDescriptor_diskqueue_4700a647b0f7ddf4, []int{10}
 }
 func (m *LeaveReply) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_LeaveReply.Unmarshal(m, b)
@@ -521,7 +521,7 @@ func (m *SnapshotRequest) Reset()         { *m = SnapshotRequest{} }
 func (m *SnapshotRequest) String() string { return proto.CompactTextString(m) }
 func (*SnapshotRequest) ProtoMessage()    {}
 func (*SnapshotRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_diskqueue_776e86b699c54ecd, []int{11}
+	return fileDescriptor_diskqueue_4700a647b0f7ddf4, []int{11}
 }
 func (m *SnapshotRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_SnapshotRequest.Unmarshal(m, b)
@@ -551,7 +551,7 @@ func (m *SnapshotReply) Reset()         { *m = SnapshotReply{} }
 func (m *SnapshotReply) String() string { return proto.CompactTextString(m) }
 func (*SnapshotReply) ProtoMessage()    {}
 func (*SnapshotReply) Descriptor() ([]byte, []int) {
-	return fileDescriptor_diskqueue_776e86b699c54ecd, []int{12}
+	return fileDescriptor_diskqueue_4700a647b0f7ddf4, []int{12}
 }
 func (m *SnapshotReply) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_SnapshotReply.Unmarshal(m, b)
@@ -586,7 +586,7 @@ func (m *Command) Reset()         { *m = Command{} }
 func (m *Command) String() string { return proto.CompactTextString(m) }
 func (*Command) ProtoMessage()    {}
 func (*Command) Descriptor() ([]byte, []int) {
-	return fileDescriptor_diskqueue_776e86b699c54ecd, []int{13}
+	return fileDescriptor_diskqueue_4700a647b0f7ddf4, []int{13}
 }
 func (m *Command) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Command.Unmarshal(m, b)
@@ -641,6 +641,202 @@ func (m *Command) GetReadPos() int64 {
 	return 0
 }
 
+type KeepAliveRequest struct {
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *KeepAliveRequest) Reset()         { *m = KeepAliveRequest{} }
+func (m *KeepAliveRequest) String() string { return proto.CompactTextString(m) }
+func (*KeepAliveRequest) ProtoMessage()    {}
+func (*KeepAliveRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_diskqueue_4700a647b0f7ddf4, []int{14}
+}
+func (m *KeepAliveRequest) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_KeepAliveRequest.Unmarshal(m, b)
+}
+func (m *KeepAliveRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_KeepAliveRequest.Marshal(b, m, deterministic)
+}
+func (dst *KeepAliveRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_KeepAliveRequest.Merge(dst, src)
+}
+func (m *KeepAliveRequest) XXX_Size() int {
+	return xxx_messageInfo_KeepAliveRequest.Size(m)
+}
+func (m *KeepAliveRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_KeepAliveRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_KeepAliveRequest proto.InternalMessageInfo
+
+type KeepAliveReply struct {
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *KeepAliveReply) Reset()         { *m = KeepAliveReply{} }
+func (m *KeepAliveReply) String() string { return proto.CompactTextString(m) }
+func (*KeepAliveReply) ProtoMessage()    {}
+func (*KeepAliveReply) Descriptor() ([]byte, []int) {
+	return fileDescriptor_diskqueue_4700a647b0f7ddf4, []int{15}
+}
+func (m *KeepAliveReply) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_KeepAliveReply.Unmarshal(m, b)
+}
+func (m *KeepAliveReply) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_KeepAliveReply.Marshal(b, m, deterministic)
+}
+func (dst *KeepAliveReply) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_KeepAliveReply.Merge(dst, src)
+}
+func (m *KeepAliveReply) XXX_Size() int {
+	return xxx_messageInfo_KeepAliveReply.Size(m)
+}
+func (m *KeepAliveReply) XXX_DiscardUnknown() {
+	xxx_messageInfo_KeepAliveReply.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_KeepAliveReply proto.InternalMessageInfo
+
+type GetStateRequest struct {
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *GetStateRequest) Reset()         { *m = GetStateRequest{} }
+func (m *GetStateRequest) String() string { return proto.CompactTextString(m) }
+func (*GetStateRequest) ProtoMessage()    {}
+func (*GetStateRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_diskqueue_4700a647b0f7ddf4, []int{16}
+}
+func (m *GetStateRequest) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_GetStateRequest.Unmarshal(m, b)
+}
+func (m *GetStateRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_GetStateRequest.Marshal(b, m, deterministic)
+}
+func (dst *GetStateRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_GetStateRequest.Merge(dst, src)
+}
+func (m *GetStateRequest) XXX_Size() int {
+	return xxx_messageInfo_GetStateRequest.Size(m)
+}
+func (m *GetStateRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_GetStateRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_GetStateRequest proto.InternalMessageInfo
+
+type GetStateReply struct {
+	State                uint32   `protobuf:"varint,1,opt,name=state,proto3" json:"state,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *GetStateReply) Reset()         { *m = GetStateReply{} }
+func (m *GetStateReply) String() string { return proto.CompactTextString(m) }
+func (*GetStateReply) ProtoMessage()    {}
+func (*GetStateReply) Descriptor() ([]byte, []int) {
+	return fileDescriptor_diskqueue_4700a647b0f7ddf4, []int{17}
+}
+func (m *GetStateReply) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_GetStateReply.Unmarshal(m, b)
+}
+func (m *GetStateReply) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_GetStateReply.Marshal(b, m, deterministic)
+}
+func (dst *GetStateReply) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_GetStateReply.Merge(dst, src)
+}
+func (m *GetStateReply) XXX_Size() int {
+	return xxx_messageInfo_GetStateReply.Size(m)
+}
+func (m *GetStateReply) XXX_DiscardUnknown() {
+	xxx_messageInfo_GetStateReply.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_GetStateReply proto.InternalMessageInfo
+
+func (m *GetStateReply) GetState() uint32 {
+	if m != nil {
+		return m.State
+	}
+	return 0
+}
+
+type WatchStateRequest struct {
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *WatchStateRequest) Reset()         { *m = WatchStateRequest{} }
+func (m *WatchStateRequest) String() string { return proto.CompactTextString(m) }
+func (*WatchStateRequest) ProtoMessage()    {}
+func (*WatchStateRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_diskqueue_4700a647b0f7ddf4, []int{18}
+}
+func (m *WatchStateRequest) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_WatchStateRequest.Unmarshal(m, b)
+}
+func (m *WatchStateRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_WatchStateRequest.Marshal(b, m, deterministic)
+}
+func (dst *WatchStateRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_WatchStateRequest.Merge(dst, src)
+}
+func (m *WatchStateRequest) XXX_Size() int {
+	return xxx_messageInfo_WatchStateRequest.Size(m)
+}
+func (m *WatchStateRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_WatchStateRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_WatchStateRequest proto.InternalMessageInfo
+
+type WatchStateReply struct {
+	State                uint32   `protobuf:"varint,1,opt,name=state,proto3" json:"state,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *WatchStateReply) Reset()         { *m = WatchStateReply{} }
+func (m *WatchStateReply) String() string { return proto.CompactTextString(m) }
+func (*WatchStateReply) ProtoMessage()    {}
+func (*WatchStateReply) Descriptor() ([]byte, []int) {
+	return fileDescriptor_diskqueue_4700a647b0f7ddf4, []int{19}
+}
+func (m *WatchStateReply) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_WatchStateReply.Unmarshal(m, b)
+}
+func (m *WatchStateReply) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_WatchStateReply.Marshal(b, m, deterministic)
+}
+func (dst *WatchStateReply) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_WatchStateReply.Merge(dst, src)
+}
+func (m *WatchStateReply) XXX_Size() int {
+	return xxx_messageInfo_WatchStateReply.Size(m)
+}
+func (m *WatchStateReply) XXX_DiscardUnknown() {
+	xxx_messageInfo_WatchStateReply.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_WatchStateReply proto.InternalMessageInfo
+
+func (m *WatchStateReply) GetState() uint32 {
+	if m != nil {
+		return m.State
+	}
+	return 0
+}
+
 func init() {
 	proto.RegisterType((*Message)(nil), "diskqueue.Message")
 	proto.RegisterType((*PushRequest)(nil), "diskqueue.PushRequest")
@@ -656,6 +852,12 @@ func init() {
 	proto.RegisterType((*SnapshotRequest)(nil), "diskqueue.SnapshotRequest")
 	proto.RegisterType((*SnapshotReply)(nil), "diskqueue.SnapshotReply")
 	proto.RegisterType((*Command)(nil), "diskqueue.Command")
+	proto.RegisterType((*KeepAliveRequest)(nil), "diskqueue.KeepAliveRequest")
+	proto.RegisterType((*KeepAliveReply)(nil), "diskqueue.KeepAliveReply")
+	proto.RegisterType((*GetStateRequest)(nil), "diskqueue.GetStateRequest")
+	proto.RegisterType((*GetStateReply)(nil), "diskqueue.GetStateReply")
+	proto.RegisterType((*WatchStateRequest)(nil), "diskqueue.WatchStateRequest")
+	proto.RegisterType((*WatchStateReply)(nil), "diskqueue.WatchStateReply")
 	proto.RegisterEnum("diskqueue.Command_Op", Command_Op_name, Command_Op_value)
 }
 
@@ -671,6 +873,8 @@ type DiskqueueGrpcClient interface {
 	Join(ctx context.Context, in *JoinRequest, opts ...tropt.CallOption) (*JoinReply, error)
 	Leave(ctx context.Context, in *LeaveRequest, opts ...tropt.CallOption) (*LeaveReply, error)
 	Snapshot(ctx context.Context, in *SnapshotRequest, opts ...tropt.CallOption) (*SnapshotReply, error)
+	GetState(ctx context.Context, in *GetStateRequest, opts ...tropt.CallOption) (*GetStateReply, error)
+	WatchState(ctx context.Context, in *WatchStateRequest, opts ...tropt.CallOption) (Diskqueue_WatchStateClient, error)
 }
 
 type diskqueueGrpcClient struct {
@@ -735,6 +939,30 @@ func (c *diskqueueGrpcClient) Snapshot(ctx context.Context, in *SnapshotRequest,
 	return out, nil
 }
 
+func (c *diskqueueGrpcClient) GetState(ctx context.Context, in *GetStateRequest, opts ...tropt.CallOption) (*GetStateReply, error) {
+	out := new(GetStateReply)
+	err := c.cc.Invoke(ctx, "/diskqueue.Diskqueue/GetState", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *diskqueueGrpcClient) WatchState(ctx context.Context, in *WatchStateRequest, opts ...tropt.CallOption) (Diskqueue_WatchStateClient, error) {
+	stream, err := c.cc.NewStream(ctx, DiskqueueGrpcServiceDesc, 0, "/diskqueue.Diskqueue/WatchState", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &diskqueueWatchStateClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
 type diskqueueGrpcServiceDesc struct {
 	desc *grpc.ServiceDesc
 }
@@ -763,6 +991,9 @@ type DiskqueueClient interface {
 	Join(ctx context1.Context, in *JoinRequest, opts ...grpc1.CallOption) (*JoinReply, error)
 	Leave(ctx context1.Context, in *LeaveRequest, opts ...grpc1.CallOption) (*LeaveReply, error)
 	Snapshot(ctx context1.Context, in *SnapshotRequest, opts ...grpc1.CallOption) (*SnapshotReply, error)
+	// rpc KeepAlive   (stream KeepAliveRequest)   returns (stream KeepAliveReply)     {}
+	GetState(ctx context1.Context, in *GetStateRequest, opts ...grpc1.CallOption) (*GetStateReply, error)
+	WatchState(ctx context1.Context, in *WatchStateRequest, opts ...grpc1.CallOption) (Diskqueue_WatchStateClient, error)
 }
 
 type diskqueueClient struct {
@@ -827,6 +1058,47 @@ func (c *diskqueueClient) Snapshot(ctx context1.Context, in *SnapshotRequest, op
 	return out, nil
 }
 
+func (c *diskqueueClient) GetState(ctx context1.Context, in *GetStateRequest, opts ...grpc1.CallOption) (*GetStateReply, error) {
+	out := new(GetStateReply)
+	err := c.cc.Invoke(ctx, "/diskqueue.Diskqueue/GetState", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *diskqueueClient) WatchState(ctx context1.Context, in *WatchStateRequest, opts ...grpc1.CallOption) (Diskqueue_WatchStateClient, error) {
+	stream, err := c.cc.NewStream(ctx, &_Diskqueue_serviceDesc.Streams[0], "/diskqueue.Diskqueue/WatchState", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &diskqueueWatchStateClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type Diskqueue_WatchStateClient interface {
+	Recv() (*WatchStateReply, error)
+	grpc1.ClientStream
+}
+
+type diskqueueWatchStateClient struct {
+	grpc1.ClientStream
+}
+
+func (x *diskqueueWatchStateClient) Recv() (*WatchStateReply, error) {
+	m := new(WatchStateReply)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 // DiskqueueServer is the server API for Diskqueue service.
 type DiskqueueServer interface {
 	Push(context1.Context, *PushRequest) (*PushReply, error)
@@ -835,6 +1107,9 @@ type DiskqueueServer interface {
 	Join(context1.Context, *JoinRequest) (*JoinReply, error)
 	Leave(context1.Context, *LeaveRequest) (*LeaveReply, error)
 	Snapshot(context1.Context, *SnapshotRequest) (*SnapshotReply, error)
+	// rpc KeepAlive   (stream KeepAliveRequest)   returns (stream KeepAliveReply)     {}
+	GetState(context1.Context, *GetStateRequest) (*GetStateReply, error)
+	WatchState(*WatchStateRequest, Diskqueue_WatchStateServer) error
 }
 
 func RegisterDiskqueueServer(s *grpc1.Server, srv DiskqueueServer) {
@@ -949,6 +1224,45 @@ func _Diskqueue_Snapshot_Handler(srv interface{}, ctx context1.Context, dec func
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Diskqueue_GetState_Handler(srv interface{}, ctx context1.Context, dec func(interface{}) error, interceptor grpc1.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetStateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DiskqueueServer).GetState(ctx, in)
+	}
+	info := &grpc1.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/diskqueue.Diskqueue/GetState",
+	}
+	handler := func(ctx context1.Context, req interface{}) (interface{}, error) {
+		return srv.(DiskqueueServer).GetState(ctx, req.(*GetStateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Diskqueue_WatchState_Handler(srv interface{}, stream grpc1.ServerStream) error {
+	m := new(WatchStateRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(DiskqueueServer).WatchState(m, &diskqueueWatchStateServer{stream})
+}
+
+type Diskqueue_WatchStateServer interface {
+	Send(*WatchStateReply) error
+	grpc1.ServerStream
+}
+
+type diskqueueWatchStateServer struct {
+	grpc1.ServerStream
+}
+
+func (x *diskqueueWatchStateServer) Send(m *WatchStateReply) error {
+	return x.ServerStream.SendMsg(m)
+}
+
 var _Diskqueue_serviceDesc = grpc1.ServiceDesc{
 	ServiceName: "diskqueue.Diskqueue",
 	HandlerType: (*DiskqueueServer)(nil),
@@ -977,46 +1291,62 @@ var _Diskqueue_serviceDesc = grpc1.ServiceDesc{
 			MethodName: "Snapshot",
 			Handler:    _Diskqueue_Snapshot_Handler,
 		},
+		{
+			MethodName: "GetState",
+			Handler:    _Diskqueue_GetState_Handler,
+		},
 	},
-	Streams:  []grpc1.StreamDesc{},
+	Streams: []grpc1.StreamDesc{
+		{
+			StreamName:    "WatchState",
+			Handler:       _Diskqueue_WatchState_Handler,
+			ServerStreams: true,
+		},
+	},
 	Metadata: "diskqueue.proto",
 }
 
-func init() { proto.RegisterFile("diskqueue.proto", fileDescriptor_diskqueue_776e86b699c54ecd) }
+func init() { proto.RegisterFile("diskqueue.proto", fileDescriptor_diskqueue_4700a647b0f7ddf4) }
 
-var fileDescriptor_diskqueue_776e86b699c54ecd = []byte{
-	// 528 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x94, 0x54, 0x4d, 0x6f, 0xd3, 0x40,
-	0x10, 0x8d, 0x1d, 0xa7, 0xb6, 0x27, 0xa1, 0x2d, 0x43, 0x5a, 0x2c, 0xc3, 0x21, 0xb2, 0x04, 0xca,
-	0x01, 0xe5, 0x90, 0x4a, 0xa8, 0x48, 0x5c, 0x4c, 0x03, 0x22, 0x7c, 0x35, 0xda, 0x0a, 0xee, 0x4b,
-	0xbc, 0x24, 0x56, 0x62, 0xef, 0xd6, 0x6b, 0x23, 0xe5, 0x37, 0xf1, 0xb7, 0xf8, 0x21, 0xc8, 0x6b,
-	0x3b, 0xb6, 0xdb, 0xa8, 0x12, 0xb7, 0xcc, 0xdb, 0x79, 0x6f, 0x9e, 0x67, 0x9e, 0x02, 0x27, 0x41,
-	0x28, 0x37, 0xb7, 0x19, 0xcb, 0xd8, 0x44, 0x24, 0x3c, 0xe5, 0x68, 0xef, 0x01, 0x8f, 0x81, 0xf9,
-	0x95, 0x49, 0x49, 0x57, 0x0c, 0x8f, 0x41, 0x9f, 0xcf, 0x1c, 0x6d, 0xa4, 0x8d, 0x0d, 0xa2, 0xcf,
-	0x67, 0x88, 0x60, 0x04, 0x34, 0xa5, 0x8e, 0x3e, 0xd2, 0xc6, 0x03, 0xa2, 0x7e, 0xa3, 0x03, 0xe6,
-	0x9a, 0xca, 0xf5, 0x67, 0xb6, 0x73, 0xba, 0x0a, 0xae, 0x4a, 0x7c, 0x0e, 0x76, 0x1a, 0x46, 0x4c,
-	0xa6, 0x34, 0x12, 0x8e, 0x31, 0xd2, 0xc6, 0x5d, 0x52, 0x03, 0x5e, 0x06, 0xfd, 0x45, 0x26, 0xd7,
-	0x84, 0xdd, 0x66, 0x4c, 0xa6, 0x38, 0x84, 0x5e, 0xca, 0x45, 0xb8, 0x54, 0xd3, 0x6c, 0x52, 0x14,
-	0xff, 0x39, 0xd0, 0x83, 0x41, 0xb8, 0x8a, 0x79, 0xc2, 0x3e, 0x84, 0xdb, 0x94, 0x25, 0x6a, 0xa6,
-	0x45, 0x5a, 0x98, 0xd7, 0x07, 0xbb, 0x18, 0x2b, 0xb6, 0x3b, 0xef, 0x2d, 0xc0, 0x82, 0x8b, 0x87,
-	0x2d, 0x38, 0x60, 0xc6, 0x8c, 0x05, 0xfe, 0x72, 0xa3, 0x5c, 0x58, 0xa4, 0x2a, 0xbd, 0x4b, 0xb0,
-	0x14, 0x5b, 0x6c, 0x77, 0xf8, 0x0a, 0xcc, 0xa8, 0x58, 0x9a, 0x62, 0xf7, 0xa7, 0x38, 0xa9, 0x57,
-	0x5c, 0xae, 0x93, 0x54, 0x2d, 0xde, 0x25, 0x80, 0xbf, 0xdc, 0x3c, 0x3c, 0x77, 0x08, 0xbd, 0x48,
-	0xae, 0xe6, 0x33, 0x35, 0xd5, 0x20, 0x45, 0xe1, 0x01, 0x58, 0x8a, 0x99, 0xbb, 0xf7, 0xa1, 0xff,
-	0x89, 0x87, 0x71, 0x25, 0xe3, 0x82, 0x95, 0xd0, 0x5f, 0xa9, 0x1f, 0x04, 0x49, 0xa9, 0xb4, 0xaf,
-	0xf1, 0x1c, 0x8e, 0x62, 0x1e, 0xb0, 0x52, 0xcd, 0x26, 0x65, 0x95, 0x6f, 0xa3, 0x90, 0xc8, 0xf5,
-	0x5e, 0xc2, 0xe0, 0x0b, 0xa3, 0xbf, 0x59, 0x25, 0x58, 0x93, 0xb4, 0x16, 0x69, 0x00, 0x50, 0xf6,
-	0xe5, 0xac, 0xc7, 0x70, 0x72, 0x13, 0x53, 0x21, 0xd7, 0x3c, 0x2d, 0x89, 0xde, 0x09, 0x3c, 0xaa,
-	0xa1, 0xbc, 0xe7, 0x8f, 0x06, 0xe6, 0x15, 0x8f, 0x22, 0x1a, 0x07, 0xf8, 0x02, 0x74, 0x2e, 0x94,
-	0xe2, 0xf1, 0xf4, 0xac, 0xb1, 0xa4, 0xf2, 0x7d, 0x72, 0x2d, 0x88, 0xce, 0x45, 0xbd, 0x14, 0xfd,
-	0x50, 0x1e, 0xba, 0x87, 0xf3, 0x60, 0xb4, 0xf3, 0xe0, 0x80, 0x99, 0x30, 0x1a, 0x2c, 0xb8, 0x74,
-	0x7a, 0x2a, 0x7e, 0x55, 0xe9, 0x3d, 0x03, 0xfd, 0x5a, 0xa0, 0x05, 0xc6, 0xe2, 0xfb, 0xcd, 0xc7,
-	0xd3, 0x0e, 0xf6, 0xc1, 0xf4, 0x67, 0x3f, 0xfc, 0x6f, 0x57, 0xef, 0x4f, 0xb5, 0xe9, 0x5f, 0x1d,
-	0xec, 0x59, 0xe5, 0x0b, 0x5f, 0x83, 0x91, 0x07, 0x06, 0xcf, 0x1b, 0x5e, 0x1b, 0xc1, 0x75, 0x87,
-	0xf7, 0xf0, 0xfc, 0x8b, 0x3b, 0x78, 0x01, 0xdd, 0x05, 0x17, 0xd8, 0xfc, 0xc4, 0x3a, 0x6b, 0xee,
-	0x93, 0xbb, 0xf0, 0x9e, 0xe4, 0x2f, 0x37, 0x2d, 0x52, 0x1d, 0x94, 0x16, 0x69, 0x9f, 0x82, 0x4e,
-	0xee, 0x30, 0x3f, 0x62, 0xcb, 0x61, 0x23, 0x18, 0x2d, 0x87, 0xf5, 0xb5, 0x3b, 0xf8, 0x06, 0x7a,
-	0xea, 0x8e, 0xf8, 0xb4, 0xd1, 0xd0, 0x4c, 0x80, 0x7b, 0x76, 0xff, 0xa1, 0xa0, 0xbe, 0x03, 0xab,
-	0xba, 0x30, 0xba, 0x8d, 0xa6, 0x3b, 0x49, 0x70, 0x9d, 0x83, 0x6f, 0x4a, 0xe3, 0xe7, 0x91, 0xfa,
-	0xe7, 0xb9, 0xf8, 0x17, 0x00, 0x00, 0xff, 0xff, 0x82, 0x42, 0xb5, 0x2a, 0x8c, 0x04, 0x00, 0x00,
+var fileDescriptor_diskqueue_4700a647b0f7ddf4 = []byte{
+	// 617 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x94, 0x54, 0xdd, 0x4e, 0xdb, 0x4c,
+	0x10, 0x8d, 0x1d, 0x07, 0xdb, 0x93, 0x40, 0xc2, 0x12, 0xf8, 0x2c, 0x7f, 0x5c, 0xa0, 0x95, 0x68,
+	0xb9, 0xa8, 0x50, 0x05, 0x52, 0x45, 0xa5, 0xde, 0xb8, 0xa4, 0x3f, 0x40, 0x5b, 0xa2, 0x45, 0x6d,
+	0xaf, 0xb7, 0xf1, 0x96, 0x58, 0x89, 0xbd, 0x8b, 0xbd, 0xa9, 0x94, 0x67, 0xea, 0xeb, 0xf5, 0x01,
+	0x2a, 0xaf, 0xff, 0x93, 0x80, 0xd4, 0xbb, 0xcc, 0x99, 0x39, 0x67, 0xc6, 0x33, 0x67, 0x03, 0x7d,
+	0x3f, 0x48, 0x66, 0x0f, 0x0b, 0xb6, 0x60, 0xa7, 0x22, 0xe6, 0x92, 0x23, 0xbb, 0x04, 0x30, 0x03,
+	0xf3, 0x33, 0x4b, 0x12, 0x7a, 0xcf, 0xd0, 0x0e, 0xe8, 0x57, 0x23, 0x47, 0x3b, 0xd2, 0x4e, 0x0c,
+	0xa2, 0x5f, 0x8d, 0x10, 0x02, 0xc3, 0xa7, 0x92, 0x3a, 0xfa, 0x91, 0x76, 0xd2, 0x23, 0xea, 0x37,
+	0x72, 0xc0, 0x9c, 0xd2, 0x64, 0x7a, 0xc3, 0x96, 0x4e, 0x5b, 0xc1, 0x45, 0x88, 0x0e, 0xc1, 0x96,
+	0x41, 0xc8, 0x12, 0x49, 0x43, 0xe1, 0x18, 0x47, 0xda, 0x49, 0x9b, 0x54, 0x00, 0x5e, 0x40, 0x77,
+	0xbc, 0x48, 0xa6, 0x84, 0x3d, 0x2c, 0x58, 0x22, 0xd1, 0x10, 0x3a, 0x92, 0x8b, 0x60, 0xa2, 0xba,
+	0xd9, 0x24, 0x0b, 0xfe, 0xb1, 0x21, 0x86, 0x5e, 0x70, 0x1f, 0xf1, 0x98, 0xbd, 0x0f, 0xe6, 0x92,
+	0xc5, 0xaa, 0xa7, 0x45, 0x1a, 0x18, 0xee, 0x82, 0x9d, 0xb5, 0x15, 0xf3, 0x25, 0x7e, 0x03, 0x30,
+	0xe6, 0xe2, 0xe9, 0x11, 0x1c, 0x30, 0x23, 0xc6, 0x7c, 0x6f, 0x32, 0x53, 0x53, 0x58, 0xa4, 0x08,
+	0xf1, 0x05, 0x58, 0x8a, 0x2d, 0xe6, 0x4b, 0xf4, 0x02, 0xcc, 0x30, 0x5b, 0x9a, 0x62, 0x77, 0xcf,
+	0xd0, 0x69, 0xb5, 0xe2, 0x7c, 0x9d, 0xa4, 0x28, 0xc1, 0x17, 0x00, 0xde, 0x64, 0xf6, 0x74, 0xdf,
+	0x21, 0x74, 0xc2, 0xe4, 0xfe, 0x6a, 0xa4, 0xba, 0x1a, 0x24, 0x0b, 0x30, 0x80, 0xa5, 0x98, 0xe9,
+	0xf4, 0x1e, 0x74, 0xaf, 0x79, 0x10, 0x15, 0x32, 0x2e, 0x58, 0x31, 0xfd, 0x29, 0x3d, 0xdf, 0x8f,
+	0x73, 0xa5, 0x32, 0x46, 0x07, 0xb0, 0x15, 0x71, 0x9f, 0xe5, 0x6a, 0x36, 0xc9, 0xa3, 0x74, 0x1b,
+	0x99, 0x44, 0xaa, 0xf7, 0x0c, 0x7a, 0x9f, 0x18, 0xfd, 0xc5, 0x0a, 0xc1, 0x8a, 0xa4, 0x35, 0x48,
+	0x3d, 0x80, 0xbc, 0x2e, 0x65, 0xed, 0x42, 0xff, 0x2e, 0xa2, 0x22, 0x99, 0x72, 0x99, 0x13, 0x71,
+	0x1f, 0xb6, 0x2b, 0x28, 0xad, 0xf9, 0xad, 0x81, 0x79, 0xc9, 0xc3, 0x90, 0x46, 0x3e, 0x3a, 0x06,
+	0x9d, 0x0b, 0xa5, 0xb8, 0x73, 0xb6, 0x5f, 0x5b, 0x52, 0x9e, 0x3f, 0xbd, 0x15, 0x44, 0xe7, 0xa2,
+	0x5a, 0x8a, 0xbe, 0xc9, 0x0f, 0xed, 0xcd, 0x7e, 0x30, 0x9a, 0x7e, 0x70, 0xc0, 0x8c, 0x19, 0xf5,
+	0xc7, 0x3c, 0x71, 0x3a, 0xca, 0x7e, 0x45, 0x88, 0xff, 0x07, 0xfd, 0x56, 0x20, 0x0b, 0x8c, 0xf1,
+	0xd7, 0xbb, 0x8f, 0x83, 0x16, 0xea, 0x82, 0xe9, 0x8d, 0xbe, 0x79, 0x5f, 0x2e, 0xdf, 0x0d, 0x34,
+	0x8c, 0x60, 0x70, 0xc3, 0x98, 0xf0, 0xe6, 0x41, 0xb9, 0x0b, 0x3c, 0x80, 0x9d, 0x1a, 0x96, 0x7f,
+	0xf7, 0x07, 0x26, 0xef, 0x24, 0x95, 0x65, 0xd1, 0x31, 0x6c, 0x57, 0x50, 0xea, 0x8a, 0x21, 0x74,
+	0x92, 0x34, 0x52, 0x9f, 0xbb, 0x4d, 0xb2, 0x00, 0xef, 0xc1, 0xee, 0x77, 0x2a, 0x27, 0xd3, 0x06,
+	0xf7, 0x39, 0xf4, 0xeb, 0xe0, 0xa3, 0xec, 0xb3, 0x3f, 0x6d, 0xb0, 0x47, 0xc5, 0xd6, 0xd0, 0x2b,
+	0x30, 0x52, 0x3b, 0xa3, 0x83, 0xda, 0x26, 0x6b, 0xcf, 0xca, 0x1d, 0xae, 0xe1, 0xe9, 0xec, 0x2d,
+	0x74, 0x0e, 0xed, 0x31, 0x17, 0xa8, 0x7e, 0x80, 0xea, 0x25, 0xb8, 0x7b, 0xab, 0x70, 0x49, 0xf2,
+	0x26, 0xb3, 0x06, 0xa9, 0xb2, 0x71, 0x83, 0x54, 0x7a, 0xb4, 0x95, 0x4e, 0x98, 0x5a, 0xac, 0x31,
+	0x61, 0xcd, 0xb6, 0x8d, 0x09, 0x2b, 0x2f, 0xb6, 0xd0, 0x6b, 0xe8, 0x28, 0x97, 0xa1, 0xff, 0x6a,
+	0x05, 0x75, 0x7f, 0xba, 0xfb, 0xeb, 0x89, 0x8c, 0xfa, 0x16, 0xac, 0xc2, 0x7f, 0xc8, 0xad, 0x15,
+	0xad, 0xf8, 0xd4, 0x75, 0x36, 0xe6, 0x4a, 0x8d, 0xe2, 0x96, 0x0d, 0x8d, 0x95, 0x9b, 0x37, 0x34,
+	0x1a, 0xc7, 0xc7, 0x2d, 0x74, 0x0d, 0x50, 0xdd, 0x14, 0x1d, 0xd6, 0x2a, 0xd7, 0xee, 0xef, 0xba,
+	0x8f, 0x64, 0x95, 0xd2, 0x4b, 0xed, 0xc7, 0x96, 0xfa, 0x9f, 0x3e, 0xff, 0x1b, 0x00, 0x00, 0xff,
+	0xff, 0x63, 0xd6, 0x0f, 0x74, 0xba, 0x05, 0x00, 0x00,
 }

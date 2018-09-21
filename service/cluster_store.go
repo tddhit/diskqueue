@@ -123,6 +123,10 @@ func (s *clusterStore) Snapshot() error {
 	return nil
 }
 
+func (s *clusterStore) GetState() uint32 {
+	return uint32(s.raftNode.State())
+}
+
 func (s *clusterStore) Close() error {
 	log.Debug("Close")
 	s.raftNode.Close()
