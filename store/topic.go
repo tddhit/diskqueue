@@ -39,9 +39,7 @@ type topic struct {
 	writeC    chan *pb.Message
 	writeRspC chan error
 
-	syncEvery    int
 	syncInterval time.Duration
-	needSync     bool
 
 	exitFlag int32
 	exitC    chan struct{}
@@ -56,7 +54,6 @@ func newTopic(dataDir, name string) (*topic, error) {
 		writeC:    make(chan *pb.Message),
 		writeRspC: make(chan error),
 
-		syncEvery:    10000,
 		syncInterval: 10 * time.Second,
 
 		exitC: make(chan struct{}),
@@ -95,6 +92,11 @@ func newTopic(dataDir, name string) (*topic, error) {
 	t.wg.Add(1)
 	go func() {
 		t.recycleLoop()
+		t.wg.Done()
+	}()
+	t.wg.Add(1)
+	go func() {
+		t.syncLoop()
 		t.wg.Done()
 	}()
 	return t, nil
@@ -146,6 +148,9 @@ func (t *topic) get() (*pb.Message, int64, error) {
 }
 
 func (t *topic) advance(pos int64) {
+	t.RLock()
+	defer t.RUnlock()
+
 	t.meta.ReadID++
 	t.readSeg.meta.ReadID++
 	t.readSeg.meta.ReadPos = pos
@@ -198,25 +203,11 @@ func (t *topic) writeOne(msg *pb.Message) error {
 }
 
 func (t *topic) writeLoop() {
-	var count int
-	syncTicker := time.NewTicker(t.syncInterval)
 	for {
-		if count == t.syncEvery {
-			t.needSync = true
-		}
-		if t.needSync {
-			if err := t.sync(); err != nil {
-				log.Error(err)
-			}
-			count = 0
-		}
 		select {
 		case msg := <-t.writeC:
-			count++
 			msg.ID = atomic.LoadUint64(&t.meta.WriteID)
 			t.writeRspC <- t.writeOne(msg)
-		case <-syncTicker.C:
-			t.needSync = true
 		case <-t.exitC:
 			goto exit
 		}
@@ -238,6 +229,24 @@ func (t *topic) recycleLoop() {
 					t.segs = t.segs[1:]
 					t.meta.Segments = t.meta.Segments[1:]
 				}
+			}
+			t.Unlock()
+		case <-t.exitC:
+			goto exit
+		}
+	}
+exit:
+	ticker.Stop()
+}
+
+func (t *topic) syncLoop() {
+	ticker := time.NewTicker(t.syncInterval)
+	for {
+		select {
+		case <-ticker.C:
+			t.Lock()
+			if err := t.sync(); err != nil {
+				log.Error(err)
 			}
 			t.Unlock()
 		case <-t.exitC:
@@ -317,6 +326,5 @@ func (t *topic) sync() error {
 	if err := t.persistMetadata(); err != nil {
 		return err
 	}
-	t.needSync = false
 	return nil
 }

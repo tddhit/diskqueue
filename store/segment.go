@@ -116,6 +116,8 @@ func (s *segment) delete() error {
 		if err := os.Remove(s.path); err != nil {
 			return err
 		}
+		log.Warnf("delete segment(%d,%d,%d)",
+			s.meta.MinID, s.meta.ReadID, s.meta.WriteID)
 		s.file = nil
 	}
 	return nil
