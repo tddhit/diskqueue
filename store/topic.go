@@ -222,7 +222,7 @@ func (t *topic) recycleLoop() {
 		select {
 		case <-ticker.C:
 			t.Lock()
-			if len(t.meta.Segments) > 0 {
+			if len(t.meta.Segments) > 1 {
 				seg := t.meta.Segments[0]
 				if seg.ReadID == seg.WriteID {
 					t.segs[0].delete()

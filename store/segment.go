@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	maxSegmentSize = 1 << 25 // 1G
+	maxSegmentSize = 1 << 25 // 128M
 	maxMsgSize     = 1 << 10 // 1k
 )
 

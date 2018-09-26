@@ -194,7 +194,7 @@ func (f *filter) eliminateLoop() {
 		select {
 		case <-ticker.C:
 			f.Lock()
-			if len(f.meta.Blooms) > 0 {
+			if len(f.meta.Blooms) > 1 {
 				b := f.meta.Blooms[0]
 				if time.Since(time.Unix(b.CreateTime, 0)) >= eliminateInterval {
 					f.blooms[0].Delete()
