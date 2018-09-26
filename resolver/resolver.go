@@ -4,6 +4,8 @@ import (
 	"errors"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/hashicorp/raft"
 	"github.com/tddhit/box/transport"
@@ -55,6 +57,7 @@ type dqResolver struct {
 	cc        resolver.ClientConn
 	rn        chan struct{}
 	wg        sync.WaitGroup
+	exitFlag  int32
 }
 
 func (r *dqResolver) ResolveNow(opt resolver.ResolveNowOption) {
@@ -65,6 +68,7 @@ func (r *dqResolver) ResolveNow(opt resolver.ResolveNowOption) {
 }
 
 func (r *dqResolver) getLeader() (string, error) {
+	log.Info("Try to get the leader of diskqueue.")
 	var (
 		wg             sync.WaitGroup
 		replies        = make(map[string]*pb.GetStateReply)
@@ -107,29 +111,37 @@ func (r *dqResolver) getLeader() (string, error) {
 func (r *dqResolver) watchLeader() {
 	defer r.wg.Done()
 	for {
+		if atomic.LoadInt32(&r.exitFlag) == 1 {
+			goto exit
+		}
 		leaderEndpoint, err := r.getLeader()
 		if err != nil {
-			return
+			time.Sleep(time.Second)
+			continue
 		}
 		r.ResolveNow(resolver.ResolveNowOption{})
 		conn, err := transport.Dial("grpc://" + leaderEndpoint)
 		if err != nil {
 			log.Error(err)
-			return
+			time.Sleep(time.Second)
+			continue
 		}
 		client := pb.NewDiskqueueGrpcClient(conn)
 		streamClient, err := client.WatchState(r.ctx, &pb.WatchStateRequest{})
 		if err != nil {
 			log.Error(err)
-			return
+			time.Sleep(time.Second)
+			continue
 		}
 		for {
 			reply, err := streamClient.Recv()
 			if err != nil || reply.GetState() != uint32(raft.Leader) {
+				log.Error("Disconnect the leader of the diskqueue", err, reply.GetState())
 				break
 			}
 		}
 	}
+exit:
 }
 
 func (r *dqResolver) watcher() {
@@ -152,6 +164,10 @@ func (r *dqResolver) watcher() {
 }
 
 func (r *dqResolver) Close() {
+	if !atomic.CompareAndSwapInt32(&r.exitFlag, 0, 1) {
+		log.Info("already closed")
+		return
+	}
 	r.cancel()
 	r.wg.Wait()
 }
