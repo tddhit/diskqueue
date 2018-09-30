@@ -21,7 +21,8 @@ var (
 type clusterStore struct {
 	sync.RWMutex
 	*store.Queue
-	raftNode *cluster.RaftNode
+	raftNode   *cluster.RaftNode
+	topicLocks map[string]*sync.RWMutex
 }
 
 func newClusterStore(dataDir, raftAddr string,
@@ -33,9 +34,29 @@ func newClusterStore(dataDir, raftAddr string,
 		return nil, err
 	}
 	return &clusterStore{
-		Queue:    queue,
-		raftNode: node,
+		Queue:      queue,
+		raftNode:   node,
+		topicLocks: make(map[string]*sync.RWMutex),
 	}, nil
+}
+
+func (s *clusterStore) getOrCreateLock(topic string) *sync.RWMutex {
+	s.RLock()
+	if m, ok := s.topicLocks[topic]; ok {
+		s.RUnlock()
+		return m
+	}
+	s.RUnlock()
+
+	s.Lock()
+	if m, ok := s.topicLocks[topic]; ok {
+		s.Unlock()
+		return m
+	}
+	m := &sync.RWMutex{}
+	s.topicLocks[topic] = m
+	s.Unlock()
+	return m
 }
 
 func (s *clusterStore) Push(topic string, data, hashKey []byte) error {
@@ -60,8 +81,9 @@ func (s *clusterStore) Pop(topic string) (*pb.Message, error) {
 	if s.raftNode.State() != raft.Leader {
 		return nil, errNotLeader
 	}
-	s.Lock()
-	defer s.Unlock()
+	mutex := s.getOrCreateLock(topic)
+	mutex.Lock()
+	defer mutex.Unlock()
 
 	msg, pos, err := s.GetMessage(topic)
 	if err != nil {

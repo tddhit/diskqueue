@@ -83,7 +83,7 @@ func (s *Service) Push(ctx context.Context,
 		if s.queue.MayContain(in.GetTopic(), hashKey) {
 			s.filterCounter.WithLabelValues().Inc()
 			log.Debug("filter:", string(hashKey))
-			return nil, status.Error(codes.AlreadyExists, "filter by bloom")
+			return &pb.PushReply{}, nil
 		}
 	}
 	if err := s.queue.Push(in.GetTopic(),

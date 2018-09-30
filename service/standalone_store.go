@@ -10,17 +10,39 @@ import (
 type standaloneStore struct {
 	sync.RWMutex
 	*store.Queue
+	topicLocks map[string]*sync.RWMutex
 }
 
 func newStandaloneStore(dataDir string) *standaloneStore {
 	return &standaloneStore{
-		Queue: store.NewQueue(dataDir),
+		Queue:      store.NewQueue(dataDir),
+		topicLocks: make(map[string]*sync.RWMutex),
 	}
 }
 
-func (s *standaloneStore) Pop(topic string) (*pb.Message, error) {
+func (s *standaloneStore) getOrCreateLock(topic string) *sync.RWMutex {
+	s.RLock()
+	if m, ok := s.topicLocks[topic]; ok {
+		s.RUnlock()
+		return m
+	}
+	s.RUnlock()
+
 	s.Lock()
-	defer s.Unlock()
+	if m, ok := s.topicLocks[topic]; ok {
+		s.Unlock()
+		return m
+	}
+	m := &sync.RWMutex{}
+	s.topicLocks[topic] = m
+	s.Unlock()
+	return m
+}
+
+func (s *standaloneStore) Pop(topic string) (*pb.Message, error) {
+	mutex := s.getOrCreateLock(topic)
+	mutex.Lock()
+	defer mutex.Unlock()
 
 	msg, pos, err := s.Queue.GetMessage(topic)
 	if err != nil {
