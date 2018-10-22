@@ -1,17 +1,16 @@
 syntax = "proto3";
 
-package diskqueue;
+package diskqueuepb;
 
 service Diskqueue {
-    rpc Push        (PushRequest)               returns (PushReply)                 {}
-    rpc Pop         (PopRequest)                returns (PopReply)                  {}
-    rpc Ack         (AckRequest)                returns (AckReply)                  {}
-    rpc Join        (JoinRequest)               returns (JoinReply)                 {}
-    rpc Leave       (LeaveRequest)              returns (LeaveReply)                {}
-    rpc Snapshot    (SnapshotRequest)           returns (SnapshotReply)             {}
-    //rpc KeepAlive   (stream KeepAliveRequest)   returns (stream KeepAliveReply)     {}
-    rpc GetState    (GetStateRequest)           returns (GetStateReply)             {}
-    rpc WatchState  (WatchStateRequest)         returns (stream WatchStateReply)    {}
+    rpc Push        (PushRequest)        returns (PushReply)                 {}
+    rpc Pop         (PopRequest)         returns (PopReply)                  {}
+    rpc Ack         (AckRequest)         returns (AckReply)                  {}
+    rpc Join        (JoinRequest)        returns (JoinReply)                 {}
+    rpc Leave       (LeaveRequest)       returns (LeaveReply)                {}
+    rpc Snapshot    (SnapshotRequest)    returns (SnapshotReply)             {}
+    rpc GetState    (GetStateRequest)    returns (GetStateReply)             {}
+    rpc WatchState  (WatchStateRequest)  returns (stream WatchStateReply)    {}
 }
 
 message Message {
@@ -33,7 +32,8 @@ message PushReply {
 
 message PopRequest {
     string topic = 1;
-    bool needAck = 2;
+    string channel = 2;
+    bool needAck = 3;
 }
 
 message PopReply {
@@ -77,15 +77,9 @@ message Command {
     }
     Op op = 1;
     string topic = 2;
-    bytes data = 3;
-    bytes hashKey = 4;
-    int64 readPos = 5;
-}
-
-message KeepAliveRequest {
-}
-
-message KeepAliveReply {
+    string channel = 3;
+    bytes data = 4;
+    bytes hashKey = 5;
 }
 
 message GetStateRequest {
@@ -100,4 +94,21 @@ message WatchStateRequest {
 
 message WatchStateReply {
     uint32 state = 1;
+}
+
+message Metadata {
+    message Channel {
+        string name = 1;
+        uint64 readID = 2;
+        int64 readPos = 3;
+    }
+    message Segment {
+        uint64 minID = 1;
+        uint64 writeID = 2;
+        int64 writePos = 3;
+    }
+    string topic = 1; 
+    uint64 writeID = 2; 
+    repeated Channel channels = 3;
+    repeated Segment segments = 4;
 }

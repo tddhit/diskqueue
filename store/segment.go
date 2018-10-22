@@ -17,24 +17,19 @@ const (
 	maxMsgSize     = 1 << 10 // 1k
 )
 
-type smeta struct {
-	MinID    uint64 `json:"minID"`
-	ReadID   uint64 `json:"readID"`
-	WriteID  uint64 `json:"writeID"`
-	ReadPos  int64  `json:"readPos"`
-	WritePos int64  `json:"writePos"`
-}
-
 type segment struct {
-	meta *smeta
-	path string
-	file *mmap.MmapFile
+	minID    uint64
+	writeID  uint64
+	writePos int64
+	path     string
+	file     *mmap.MmapFile
 }
 
-func newSegment(path string, mode, advise int, m *smeta) (*segment, error) {
+func newSegment(path string, mode, advise int, minID uint64) (*segment, error) {
 	s := &segment{
-		path: path,
-		meta: m,
+		minID:   minID,
+		writeID: minID,
+		path:    path,
 	}
 	file, err := mmap.New(path, maxSegmentSize+2*maxMsgSize, mode, advise)
 	if err != nil {
@@ -45,7 +40,7 @@ func newSegment(path string, mode, advise int, m *smeta) (*segment, error) {
 }
 
 func (s *segment) full() bool {
-	size := atomic.LoadInt64(&s.meta.WritePos)
+	size := atomic.LoadInt64(&s.writePos)
 	if size < maxSegmentSize {
 		return false
 	}
@@ -62,7 +57,7 @@ func (s *segment) writeOne(msg *pb.Message) error {
 	if len > maxMsgSize {
 		return fmt.Errorf("invalid msg:size(%d)>maxSize(%d)", len, maxMsgSize)
 	}
-	offset := atomic.LoadInt64(&s.meta.WritePos)
+	offset := atomic.LoadInt64(&s.writePos)
 	if err := s.file.PutUint32At(offset, len); err != nil {
 		return err
 	}
@@ -71,33 +66,32 @@ func (s *segment) writeOne(msg *pb.Message) error {
 		return err
 	}
 	offset += int64(len)
-	atomic.StoreInt64(&s.meta.WritePos, offset)
-	atomic.AddUint64(&s.meta.WriteID, 1)
+	atomic.StoreInt64(&s.writePos, offset)
+	atomic.AddUint64(&s.writeID, 1)
 	return nil
 }
 
-func (s *segment) readOne(msgID uint64) (*pb.Message, int64, error) {
+func (s *segment) readOne(msgID uint64, pos int64) (*pb.Message, int64) {
 	msg := &pb.Message{}
-	offset := s.meta.ReadPos
+	offset := pos
 	len, err := s.file.Uint32At(offset)
 	if err != nil {
-		return nil, 0, err
+		log.Fatal(err)
 	}
 	offset += 4
 	buf, err := s.file.ReadAt(offset, int64(len))
 	if err != nil {
-		return nil, 0, err
+		log.Fatal(err)
 	}
 	offset += int64(len)
 	if err := proto.Unmarshal(buf, msg); err != nil {
-		log.Error(err)
-		return nil, 0, err
+		log.Fatal(err)
 	}
 	if msg.GetID() != msgID {
-		return nil, 0, fmt.Errorf("msg.GetID(%d) != msgID(%d)", msg.GetID(), msgID)
+		log.Fatalf("msg.GetID(%d) != msgID(%d)", msg.GetID(), msgID)
 	}
 	log.Debugf("seg readOne\tid=%d", msg.GetID())
-	return msg, offset, nil
+	return msg, offset - pos
 }
 
 func (s *segment) sync() error {
@@ -116,8 +110,7 @@ func (s *segment) delete() error {
 		if err := os.Remove(s.path); err != nil {
 			return err
 		}
-		log.Warnf("delete segment(%d,%d,%d)",
-			s.meta.MinID, s.meta.ReadID, s.meta.WriteID)
+		log.Warnf("delete segment(%d-%d)", s.minID, s.writeID)
 		s.file = nil
 	}
 	return nil
@@ -127,4 +120,4 @@ type segments []*segment
 
 func (s segments) Len() int           { return len(s) }
 func (s segments) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
-func (s segments) Less(i, j int) bool { return s[i].meta.MinID < s[j].meta.MinID }
+func (s segments) Less(i, j int) bool { return s[i].minID < s[j].minID }

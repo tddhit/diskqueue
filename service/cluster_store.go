@@ -77,7 +77,7 @@ func (s *clusterStore) Push(topic string, data, hashKey []byte) error {
 	return f.Error()
 }
 
-func (s *clusterStore) Pop(topic string) (*pb.Message, error) {
+func (s *clusterStore) Pop(topic, channel string) (*pb.Message, error) {
 	if s.raftNode.State() != raft.Leader {
 		return nil, errNotLeader
 	}
@@ -85,14 +85,14 @@ func (s *clusterStore) Pop(topic string) (*pb.Message, error) {
 	mutex.Lock()
 	defer mutex.Unlock()
 
-	msg, pos, err := s.GetMessage(topic)
+	msg, err := s.GetMessage(topic, channel)
 	if err != nil {
 		return nil, err
 	}
 	cmd, err := proto.Marshal(&pb.Command{
 		Op:      pb.Command_ADVANCE,
 		Topic:   topic,
-		ReadPos: pos,
+		Channel: channel,
 	})
 	if err != nil {
 		return nil, err

@@ -39,16 +39,16 @@ func (s *standaloneStore) getOrCreateLock(topic string) *sync.RWMutex {
 	return m
 }
 
-func (s *standaloneStore) Pop(topic string) (*pb.Message, error) {
+func (s *standaloneStore) Pop(topic, channel string) (*pb.Message, error) {
 	mutex := s.getOrCreateLock(topic)
 	mutex.Lock()
 	defer mutex.Unlock()
 
-	msg, pos, err := s.Queue.GetMessage(topic)
+	msg, err := s.Queue.GetMessage(topic, channel)
 	if err != nil {
 		return nil, err
 	}
-	s.Queue.Advance(topic, pos)
+	s.Queue.Advance(topic, channel)
 	return msg, nil
 }
 

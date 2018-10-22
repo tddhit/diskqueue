@@ -12,7 +12,7 @@ import (
 
 type queue interface {
 	Push(topic string, data, hashKey []byte) error
-	Advance(topic string, pos int64)
+	Advance(topic, channel string)
 }
 
 type fsm struct {
@@ -34,7 +34,7 @@ func (f *fsm) Apply(l *raft.Log) interface{} {
 	case pb.Command_PUSH:
 		return f.queue.Push(cmd.GetTopic(), cmd.GetData(), cmd.GetHashKey())
 	case pb.Command_ADVANCE:
-		f.queue.Advance(cmd.GetTopic(), cmd.GetReadPos())
+		f.queue.Advance(cmd.GetTopic(), cmd.GetChannel())
 	default:
 		log.Panic("Invalid Op")
 	}

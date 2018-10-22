@@ -1,62 +1,49 @@
 package store
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
 	"os"
 	"path"
-	"runtime"
 	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/gogo/protobuf/proto"
 	"github.com/tddhit/tools/log"
 	"github.com/tddhit/tools/mmap"
 
 	pb "github.com/tddhit/diskqueue/pb"
 )
 
-type tmeta struct {
-	WriteID  uint64   `json:"writeID"`
-	ReadID   uint64   `json:"readID"`
-	Segments []*smeta `json:"segments"`
-}
-
 type topic struct {
 	sync.RWMutex
-	Name    string
-	dataDir string
-	meta    tmeta
-
-	filter   *filter
-	readSeg  *segment
-	writeSeg *segment
-	segs     segments
-
-	writeC    chan *pb.Message
-	writeRspC chan error
-
+	name         string
+	dataDir      string
+	writeID      uint64
+	segs         segments
+	channels     map[string]*channel
+	filter       *filter
+	writeSeg     *segment
+	writeC       chan *pb.Message
+	writeRspC    chan error
 	syncInterval time.Duration
-
-	exitFlag int32
-	exitC    chan struct{}
-	wg       sync.WaitGroup
+	exitFlag     int32
+	exitC        chan struct{}
+	wg           sync.WaitGroup
 }
 
 func newTopic(dataDir, name string) (*topic, error) {
 	t := &topic{
-		Name:    name,
-		dataDir: path.Join(dataDir, name, "data"),
-
-		writeC:    make(chan *pb.Message),
-		writeRspC: make(chan error),
-
+		name:         name,
+		dataDir:      path.Join(dataDir, name, "data"),
+		writeC:       make(chan *pb.Message),
+		writeRspC:    make(chan error),
 		syncInterval: 10 * time.Second,
-
-		exitC: make(chan struct{}),
+		exitC:        make(chan struct{}),
 	}
 	if err := os.MkdirAll(t.dataDir, 0755); err != nil && !os.IsExist(err) {
 		log.Error(err)
@@ -73,16 +60,10 @@ func newTopic(dataDir, name string) (*topic, error) {
 		}
 	}
 	if len(t.segs) == 0 {
-		meta := &smeta{}
-		if err := t.createSegment(mmap.APPEND, meta); err != nil {
+		if err := t.createSegment(mmap.APPEND, 0); err != nil {
 			return nil, err
 		}
-		t.meta.Segments = append(t.meta.Segments, meta)
 		t.sync()
-	}
-	t.readSeg, err = t.seek(t.meta.ReadID)
-	if err != nil {
-		return nil, err
 	}
 	t.wg.Add(1)
 	go func() {
@@ -113,66 +94,23 @@ func (t *topic) push(data []byte) error {
 	return <-t.writeRspC
 }
 
-func (t *topic) get() (*pb.Message, int64, error) {
-	var (
-		msg *pb.Message
-		err error
-		pos int64
-	)
-	for {
-		if atomic.LoadInt32(&t.exitFlag) == 1 {
-			return nil, 0, errors.New("diskqueue already close")
-		}
-		if t.readSeg == nil {
-			t.readSeg, err = t.seek(t.meta.ReadID)
-			if err != nil {
-				log.Fatal(err)
-			}
-		}
-		if t.meta.ReadID < atomic.LoadUint64(&t.meta.WriteID) {
-			if t.meta.ReadID < atomic.LoadUint64(&t.readSeg.meta.WriteID) {
-				msg, pos, err = t.readSeg.readOne(t.meta.ReadID)
-				if err != nil {
-					log.Fatal(err)
-				}
-			} else {
-				t.readSeg = nil
-				continue
-			}
-		} else {
-			runtime.Gosched()
-			continue
-		}
-		return msg, pos, nil
-	}
-}
-
-func (t *topic) advance(pos int64) {
-	t.RLock()
-	defer t.RUnlock()
-
-	t.meta.ReadID++
-	t.readSeg.meta.ReadID++
-	t.readSeg.meta.ReadPos = pos
-}
-
-func (t *topic) seek(msgID uint64) (*segment, error) {
+func (t *topic) seek(msgID uint64) *segment {
 	if len(t.segs) == 0 {
-		return nil, errors.New("empty segments")
+		log.Fatal("empty segments")
 	}
 	index := sort.Search(len(t.segs), func(i int) bool {
-		return t.segs[i].meta.MinID > msgID
+		return t.segs[i].minID > msgID
 	})
 	if index == 0 {
-		return nil, errors.New("not found segment")
+		log.Fatal("not found segment")
 	}
-	return t.segs[index-1], nil
+	return t.segs[index-1]
 }
 
-func (t *topic) createSegment(mode int, meta *smeta) error {
+func (t *topic) createSegment(mode int, minID uint64) error {
 	file := fmt.Sprintf(path.Join(t.dataDir, "%s.diskqueue.%d.dat"),
-		t.Name, meta.MinID)
-	seg, err := newSegment(file, mode, mmap.SEQUENTIAL, meta)
+		t.name, minID)
+	seg, err := newSegment(file, mode, mmap.SEQUENTIAL, minID)
 	if err != nil {
 		return err
 	}
@@ -183,21 +121,15 @@ func (t *topic) createSegment(mode int, meta *smeta) error {
 
 func (t *topic) writeOne(msg *pb.Message) error {
 	if t.writeSeg.full() {
-		meta := &smeta{
-			MinID:   msg.ID,
-			ReadID:  msg.ID,
-			WriteID: msg.ID,
-		}
-		if err := t.createSegment(mmap.APPEND, meta); err != nil {
+		if err := t.createSegment(mmap.APPEND, msg.ID); err != nil {
 			return err
 		}
-		t.meta.Segments = append(t.meta.Segments, meta)
 		t.sync()
 	}
 	if err := t.writeSeg.writeOne(msg); err != nil {
 		return err
 	}
-	atomic.AddUint64(&t.meta.WriteID, 1)
+	atomic.AddUint64(&t.writeID, 1)
 	log.Debugf("writeOne\tid=%d\tdata=%s", msg.ID, string(msg.GetData()))
 	return nil
 }
@@ -206,14 +138,14 @@ func (t *topic) writeLoop() {
 	for {
 		select {
 		case msg := <-t.writeC:
-			msg.ID = atomic.LoadUint64(&t.meta.WriteID)
+			msg.ID = atomic.LoadUint64(&t.writeID)
 			t.writeRspC <- t.writeOne(msg)
 		case <-t.exitC:
 			goto exit
 		}
 	}
 exit:
-	log.Infof("diskqueue(%s) exit writeLoop.", t.Name)
+	log.Infof("diskqueue(%s) exit writeLoop.", t.name)
 }
 
 func (t *topic) recycleLoop() {
@@ -222,13 +154,9 @@ func (t *topic) recycleLoop() {
 		select {
 		case <-ticker.C:
 			t.Lock()
-			if len(t.meta.Segments) > 1 {
-				seg := t.meta.Segments[0]
-				if seg.ReadID == seg.WriteID {
-					t.segs[0].delete()
-					t.segs = t.segs[1:]
-					t.meta.Segments = t.meta.Segments[1:]
-				}
+			if len(t.segs) > 1 {
+				t.segs[0].delete()
+				t.segs = t.segs[1:]
 			}
 			t.Unlock()
 		case <-t.exitC:
@@ -258,15 +186,41 @@ exit:
 }
 
 func (t *topic) persistMetadata() error {
-	filename := fmt.Sprintf(path.Join(t.dataDir, "%s.diskqueue.meta"), t.Name)
+	filename := fmt.Sprintf(path.Join(t.dataDir, "%s.diskqueue.meta"), t.name)
 	tmpFilename := fmt.Sprintf("%s.%d.tmp", filename, rand.Int())
 	f, err := os.OpenFile(tmpFilename, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
 	if err != nil {
 		return err
 	}
-	encoder := json.NewEncoder(f)
-	encoder.SetIndent("", "    ")
-	if err := encoder.Encode(t.meta); err != nil {
+	meta := &pb.Metadata{
+		Topic:   t.name,
+		WriteID: t.writeID,
+	}
+	for _, c := range t.channels {
+		meta.Channels = append(meta.Channels, &pb.Metadata_Channel{
+			Name:    c.name,
+			ReadID:  c.readID,
+			ReadPos: c.readPos,
+		})
+	}
+	for _, s := range t.segs {
+		meta.Segments = append(meta.Segments, &pb.Metadata_Segment{
+			MinID:    s.minID,
+			WriteID:  s.writeID,
+			WritePos: s.writePos,
+		})
+	}
+	data, err := proto.Marshal(meta)
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+	n, err := f.Write(data)
+	if n != len(data) {
+		return errors.New("persist metadata fail.")
+	}
+	if err != nil {
+		log.Error(err)
 		return err
 	}
 	f.Sync()
@@ -275,30 +229,51 @@ func (t *topic) persistMetadata() error {
 }
 
 func (t *topic) loadMetadata() error {
-	filename := fmt.Sprintf(path.Join(t.dataDir, "%s.diskqueue.meta"), t.Name)
-	f, err := os.Open(filename)
+	filename := fmt.Sprintf(path.Join(t.dataDir, "%s.diskqueue.meta"), t.name)
+	data, err := ioutil.ReadFile(filename)
 	if err != nil {
+		log.Error(err)
 		return err
 	}
-	decoder := json.NewDecoder(f)
-	if err := decoder.Decode(&t.meta); err != nil {
+	meta := &pb.Metadata{}
+	if err := proto.Unmarshal(data, meta); err != nil {
+		log.Error(err)
 		return err
 	}
 	var mode int
-	for i, meta := range t.meta.Segments {
-		if i != len(t.meta.Segments)-1 {
+	for i, s := range meta.Segments {
+		if i != len(meta.Segments)-1 {
 			mode = mmap.RDONLY
 		} else {
 			mode = mmap.APPEND
 		}
-		if err := t.createSegment(mode, meta); err != nil {
+		if err := t.createSegment(mode, s.MinID); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (t *topic) Close() error {
+func (t *topic) getOrCreateChannel(name string) (_ *channel, created bool) {
+	t.RLock()
+	if c, ok := t.channels[name]; ok {
+		t.RUnlock()
+		return c, false
+	}
+	t.RUnlock()
+
+	t.Lock()
+	if c, ok := t.channels[name]; ok {
+		t.Unlock()
+		return c, false
+	}
+	c := newChannel(name, t)
+	t.channels[name] = c
+	t.Unlock()
+	return c, true
+}
+
+func (t *topic) close() error {
 	log.Debug("Close")
 	t.Lock()
 	defer t.Unlock()

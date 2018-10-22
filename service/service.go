@@ -16,7 +16,7 @@ import (
 
 type queue interface {
 	Push(topic string, data, hashKey []byte) error
-	Pop(topic string) (*pb.Message, error)
+	Pop(topic, channel string) (*pb.Message, error)
 	MayContain(topic string, key []byte) bool
 	HasTopic(topic string) bool
 	Join(raftAddr, nodeID string) error
@@ -108,7 +108,7 @@ func (s *Service) Pop(ctx context.Context,
 		for inflight.full() {
 			inflight.cond.Wait()
 		}
-		msg, err = s.queue.Pop(in.GetTopic())
+		msg, err = s.queue.Pop(in.GetTopic(), in.GetChannel())
 		if err != nil {
 			inflight.cond.L.Unlock()
 			return nil, err
@@ -116,7 +116,7 @@ func (s *Service) Pop(ctx context.Context,
 		inflight.push(msg)
 		inflight.cond.L.Unlock()
 	} else {
-		msg, err = s.queue.Pop(in.GetTopic())
+		msg, err = s.queue.Pop(in.GetTopic(), in.GetChannel())
 		if err != nil {
 			return nil, err
 		}

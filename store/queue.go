@@ -47,14 +47,16 @@ func (s *Queue) Push(topic string, data, hashKey []byte) error {
 	return nil
 }
 
-func (s *Queue) GetMessage(topic string) (*pb.Message, int64, error) {
+func (s *Queue) GetMessage(topic, channel string) (*pb.Message, error) {
 	t := s.GetOrCreateTopic(topic)
-	return t.get()
+	c, _ := t.getOrCreateChannel(channel)
+	return c.get()
 }
 
-func (s *Queue) Advance(topic string, pos int64) {
+func (s *Queue) Advance(topic, channel string) {
 	t := s.GetOrCreateTopic(topic)
-	t.advance(pos)
+	c, _ := t.getOrCreateChannel(channel)
+	c.advance()
 }
 
 func (s *Queue) GetTopic(name string) (*topic, bool) {
@@ -93,7 +95,7 @@ func (s *Queue) Close() error {
 	defer s.Unlock()
 
 	for _, t := range s.topics {
-		t.Close()
+		t.close()
 	}
 	return nil
 }
