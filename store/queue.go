@@ -3,11 +3,8 @@ package store
 import (
 	"sync"
 
+	"github.com/tddhit/diskqueue/pb"
 	"github.com/tddhit/tools/log"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-
-	pb "github.com/tddhit/diskqueue/pb"
 )
 
 type Queue struct {
@@ -23,43 +20,42 @@ func NewQueue(dataDir string) *Queue {
 	}
 }
 
-func (s *Queue) HasTopic(topic string) bool {
-	_, ok := s.GetTopic(topic)
-	return ok
+func (s *Queue) Push(topic string, data, hashKey []byte) (uint64, error) {
+	t, err := s.getOrCreateTopic(topic)
+	if err != nil {
+		return 0, err
+	}
+	id, err := t.push(data)
+	if err != nil {
+		return 0, err
+	}
+	return id, nil
 }
 
-func (s *Queue) MayContain(topic string, key []byte) bool {
-	t, exist := s.GetTopic(topic)
-	return exist && t.filter.mayContain(key)
-}
+func (s *Queue) Get(
+	topic string,
+	channel string) (*diskqueuepb.Message, int64, error) {
 
-func (s *Queue) Push(topic string, data, hashKey []byte) error {
-	t := s.GetOrCreateTopic(topic)
-	if len(hashKey) == 0 {
-		hashKey = data
+	t, err := s.getOrCreateTopic(topic)
+	if err != nil {
+		return nil, 0, err
 	}
-	if err := t.filter.add(hashKey); err != nil {
-		return status.Error(codes.Internal, err.Error())
-	}
-	if err := t.push(data); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (s *Queue) GetMessage(topic, channel string) (*pb.Message, error) {
-	t := s.GetOrCreateTopic(topic)
 	c, _ := t.getOrCreateChannel(channel)
 	return c.get()
 }
 
-func (s *Queue) Advance(topic, channel string) {
-	t := s.GetOrCreateTopic(topic)
+func (s *Queue) Advance(topic, channel string, nextPos int64) {
+	t, _ := s.getOrCreateTopic(topic)
 	c, _ := t.getOrCreateChannel(channel)
-	c.advance()
+	c.advance(nextPos)
 }
 
-func (s *Queue) GetTopic(name string) (*topic, bool) {
+func (s *Queue) HasTopic(name string) bool {
+	_, ok := s.getTopic(name)
+	return ok
+}
+
+func (s *Queue) getTopic(name string) (*topic, bool) {
 	s.RLock()
 	defer s.RUnlock()
 
@@ -67,35 +63,34 @@ func (s *Queue) GetTopic(name string) (*topic, bool) {
 	return t, ok
 }
 
-func (s *Queue) GetOrCreateTopic(name string) *topic {
+func (s *Queue) getOrCreateTopic(name string) (*topic, error) {
 	s.RLock()
 	if t, ok := s.topics[name]; ok {
 		s.RUnlock()
-		return t
+		return t, nil
 	}
 	s.RUnlock()
 
 	s.Lock()
 	if t, ok := s.topics[name]; ok {
 		s.Unlock()
-		return t
+		return t, nil
 	}
 	topic, err := newTopic(s.dataDir, name)
 	if err != nil {
-		log.Fatal(err)
+		log.Error(err)
+		return nil, err
 	}
 	s.topics[name] = topic
 	s.Unlock()
-	return topic
+	return topic, nil
 }
 
-func (s *Queue) Close() error {
-	log.Debug("Close")
+func (s *Queue) Close() {
 	s.Lock()
 	defer s.Unlock()
 
 	for _, t := range s.topics {
 		t.close()
 	}
-	return nil
 }

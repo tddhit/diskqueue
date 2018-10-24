@@ -68,7 +68,7 @@ func NewRaftNode(dir, addr, id, leaderAddr string, q queue) (*RaftNode, error) {
 			log.Fatal(err)
 		}
 		client := pb.NewDiskqueueGrpcClient(conn)
-		_, err = client.Join(context.Background(), &pb.JoinRequest{
+		_, err = client.Join(context.Background(), &pb.JoinReq{
 			RaftAddr: addr,
 			NodeID:   id,
 		})

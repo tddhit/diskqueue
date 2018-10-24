@@ -8,6 +8,7 @@ import (
 	"github.com/tddhit/box/mw"
 	"github.com/tddhit/tools/dirlock"
 	"github.com/tddhit/tools/log"
+	"github.com/urfave/cli"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -15,9 +16,8 @@ import (
 )
 
 type queue interface {
-	Push(topic string, data, hashKey []byte) error
+	Push(topic string, data, hashKey []byte) (uint64, error)
 	Pop(topic, channel string) (*pb.Message, error)
-	MayContain(topic string, key []byte) bool
 	HasTopic(topic string) bool
 	Join(raftAddr, nodeID string) error
 	Leave(nodeID string) error
@@ -35,7 +35,17 @@ type Service struct {
 	filterCounter *prometheus.CounterVec
 }
 
-func New(dataDir, mode, raftAddr, nodeID, leaderAddr string) *Service {
+func NewService(ctx *cli.Context) *Service {
+	dataDir := ctx.String("datadir")
+	mode := ctx.String("mode")
+	raftAddr := ctx.String("cluster-addr")
+	nodeID := ctx.String("id")
+	leaderAddr := ctx.String("leader")
+	if mode == "cluster" {
+		if raftAddr == "" || nodeID == "" {
+			log.Fatal("invalid params")
+		}
+	}
 	if !mw.IsWorker() {
 		return nil
 	}
@@ -50,7 +60,7 @@ func New(dataDir, mode, raftAddr, nodeID, leaderAddr string) *Service {
 	case "standalone":
 		fallthrough
 	default:
-		q = newStandaloneStore(dataDir)
+		//q = newStandaloneStore(dataDir)
 	}
 	s := &Service{
 		queue:   q,
@@ -73,29 +83,18 @@ func New(dataDir, mode, raftAddr, nodeID, leaderAddr string) *Service {
 }
 
 func (s *Service) Push(ctx context.Context,
-	in *pb.PushRequest) (*pb.PushReply, error) {
+	in *pb.PushReq) (*pb.PushRsp, error) {
 
-	if !in.GetIgnoreFilter() {
-		hashKey := in.GetData()
-		if in.GetHashKey() != nil {
-			hashKey = in.GetHashKey()
-		}
-		if s.queue.MayContain(in.GetTopic(), hashKey) {
-			s.filterCounter.WithLabelValues().Inc()
-			log.Debug("filter:", string(hashKey))
-			return &pb.PushReply{}, nil
-		}
-	}
-	if err := s.queue.Push(in.GetTopic(),
-		in.GetData(), in.GetHashKey()); err != nil {
-
+	id, err := s.queue.Push(in.GetTopic(), in.GetData(), in.GetHashKey())
+	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	return &pb.PushReply{}, nil
+	log.Debugf("push\t%s\t%d\t%s", in.Topic, id, string(in.Data))
+	return &pb.PushRsp{ID: id}, nil
 }
 
 func (s *Service) Pop(ctx context.Context,
-	in *pb.PopRequest) (*pb.PopReply, error) {
+	in *pb.PopReq) (*pb.PopRsp, error) {
 
 	var (
 		msg *pb.Message
@@ -121,11 +120,12 @@ func (s *Service) Pop(ctx context.Context,
 			return nil, err
 		}
 	}
-	return &pb.PopReply{Message: msg}, nil
+	log.Debugf("pop\t%s\t%s\t%d\ts", in.Topic, in.Channel, msg.ID, string(msg.Data))
+	return &pb.PopRsp{Message: msg}, nil
 }
 
 func (s *Service) Ack(ctx context.Context,
-	in *pb.AckRequest) (*pb.AckReply, error) {
+	in *pb.AckReq) (*pb.AckRsp, error) {
 
 	client := ctx.Value("client").(*client)
 	if !s.queue.HasTopic(in.GetTopic()) {
@@ -140,44 +140,44 @@ func (s *Service) Ack(ctx context.Context,
 	if err := inflight.remove(in.GetMsgID()); err != nil {
 		return nil, status.Error(codes.NotFound, err.Error())
 	}
-	return &pb.AckReply{}, nil
+	return &pb.AckRsp{}, nil
 }
 
 func (s *Service) Join(ctx context.Context,
-	in *pb.JoinRequest) (*pb.JoinReply, error) {
+	in *pb.JoinReq) (*pb.JoinRsp, error) {
 
 	if err := s.queue.Join(in.GetRaftAddr(), in.GetNodeID()); err != nil {
 		return nil, err
 	}
-	return &pb.JoinReply{}, nil
+	return &pb.JoinRsp{}, nil
 }
 
 func (s *Service) Leave(ctx context.Context,
-	in *pb.LeaveRequest) (*pb.LeaveReply, error) {
+	in *pb.LeaveReq) (*pb.LeaveRsp, error) {
 
 	if err := s.queue.Leave(in.GetNodeID()); err != nil {
 		return nil, err
 	}
-	return &pb.LeaveReply{}, nil
+	return &pb.LeaveRsp{}, nil
 }
 
 func (s *Service) Snapshot(ctx context.Context,
-	in *pb.SnapshotRequest) (*pb.SnapshotReply, error) {
+	in *pb.SnapshotReq) (*pb.SnapshotRsp, error) {
 
 	return nil, nil
 }
 
 func (s *Service) GetState(ctx context.Context,
-	in *pb.GetStateRequest) (*pb.GetStateReply, error) {
+	in *pb.GetStateReq) (*pb.GetStateRsp, error) {
 
-	return &pb.GetStateReply{State: s.queue.GetState()}, nil
+	return &pb.GetStateRsp{State: s.queue.GetState()}, nil
 }
 
-func (s *Service) WatchState(in *pb.WatchStateRequest,
+func (s *Service) WatchState(in *pb.WatchStateReq,
 	stream pb.Diskqueue_WatchStateServer) error {
 
 	for {
-		err := stream.Send(&pb.WatchStateReply{State: s.queue.GetState()})
+		err := stream.Send(&pb.WatchStateRsp{State: s.queue.GetState()})
 		if err != nil {
 			return err
 		}

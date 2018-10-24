@@ -7,11 +7,11 @@ import (
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/hashicorp/raft"
-	"github.com/tddhit/tools/log"
 
 	"github.com/tddhit/diskqueue/cluster"
-	pb "github.com/tddhit/diskqueue/pb"
+	"github.com/tddhit/diskqueue/pb"
 	"github.com/tddhit/diskqueue/store"
+	"github.com/tddhit/tools/log"
 )
 
 var (
@@ -21,12 +21,15 @@ var (
 type clusterStore struct {
 	sync.RWMutex
 	*store.Queue
-	raftNode   *cluster.RaftNode
-	topicLocks map[string]*sync.RWMutex
+	raftNode *cluster.RaftNode
+	locks    map[string]*sync.RWMutex
 }
 
-func newClusterStore(dataDir, raftAddr string,
-	nodeID, leaderAddr string) (*clusterStore, error) {
+func newClusterStore(
+	dataDir string,
+	raftAddr string,
+	nodeID string,
+	leaderAddr string) (*clusterStore, error) {
 
 	queue := store.NewQueue(dataDir)
 	node, err := cluster.NewRaftNode(dataDir, raftAddr, nodeID, leaderAddr, queue)
@@ -34,65 +37,54 @@ func newClusterStore(dataDir, raftAddr string,
 		return nil, err
 	}
 	return &clusterStore{
-		Queue:      queue,
-		raftNode:   node,
-		topicLocks: make(map[string]*sync.RWMutex),
+		Queue:    queue,
+		raftNode: node,
+		locks:    make(map[string]*sync.RWMutex),
 	}, nil
 }
 
-func (s *clusterStore) getOrCreateLock(topic string) *sync.RWMutex {
-	s.RLock()
-	if m, ok := s.topicLocks[topic]; ok {
-		s.RUnlock()
-		return m
-	}
-	s.RUnlock()
-
-	s.Lock()
-	if m, ok := s.topicLocks[topic]; ok {
-		s.Unlock()
-		return m
-	}
-	m := &sync.RWMutex{}
-	s.topicLocks[topic] = m
-	s.Unlock()
-	return m
-}
-
-func (s *clusterStore) Push(topic string, data, hashKey []byte) error {
+func (s *clusterStore) Push(topic string, data, hashKey []byte) (uint64, error) {
 	if s.raftNode.State() != raft.Leader {
-		return errNotLeader
+		return 0, errNotLeader
 	}
-	cmd, err := proto.Marshal(&pb.Command{
-		Op:      pb.Command_PUSH,
+	cmd, err := proto.Marshal(&diskqueuepb.Command{
+		Op:      diskqueuepb.Command_PUSH,
 		Topic:   topic,
 		Data:    data,
 		HashKey: hashKey,
 	})
 	if err != nil {
 		log.Error(err)
-		return err
+		return 0, err
 	}
 	f := s.raftNode.Apply(cmd, 10*time.Second)
-	return f.Error()
+	if err := f.Error(); err != nil {
+		return 0, err
+	}
+	rsp := f.Response().(struct {
+		ID  uint64
+		Err error
+	})
+	return rsp.ID, rsp.Err
 }
 
-func (s *clusterStore) Pop(topic, channel string) (*pb.Message, error) {
+func (s *clusterStore) Pop(topic, channel string) (*diskqueuepb.Message, error) {
 	if s.raftNode.State() != raft.Leader {
 		return nil, errNotLeader
 	}
-	mutex := s.getOrCreateLock(topic)
+	mutex := s.getOrCreateLock(topic + "&" + channel)
 	mutex.Lock()
 	defer mutex.Unlock()
 
-	msg, err := s.GetMessage(topic, channel)
+	msg, nextPos, err := s.Get(topic, channel)
 	if err != nil {
 		return nil, err
 	}
-	cmd, err := proto.Marshal(&pb.Command{
-		Op:      pb.Command_ADVANCE,
+	cmd, err := proto.Marshal(&diskqueuepb.Command{
+		Op:      diskqueuepb.Command_ADVANCE,
 		Topic:   topic,
 		Channel: channel,
+		NextPos: nextPos,
 	})
 	if err != nil {
 		return nil, err
@@ -147,6 +139,26 @@ func (s *clusterStore) Snapshot() error {
 
 func (s *clusterStore) GetState() uint32 {
 	return uint32(s.raftNode.State())
+}
+
+func (s *clusterStore) getOrCreateLock(name string) *sync.RWMutex {
+	s.RLock()
+	if m, ok := s.locks[name]; ok {
+		s.RUnlock()
+		return m
+	}
+	s.RUnlock()
+
+	s.Lock()
+	if m, ok := s.locks[name]; ok {
+		s.Unlock()
+		return m
+	}
+	m := &sync.RWMutex{}
+	s.locks[name] = m
+	s.Unlock()
+
+	return m
 }
 
 func (s *clusterStore) Close() error {

@@ -3,69 +3,47 @@ package store
 import (
 	"fmt"
 	"runtime"
-	"sync"
+	"sort"
 	"sync/atomic"
 
-	pb "github.com/tddhit/diskqueue/pb"
+	"github.com/tddhit/diskqueue/pb"
+	"github.com/tddhit/tools/log"
 )
 
-type consumer interface {
-	Close() error
-	ID() string
-}
-
 type channel struct {
-	sync.RWMutex
-	name       string
-	topic      *topic
-	readSeg    *segment
-	readID     uint64
-	readPos    int64
-	curMsgSize int
-	consumers  map[string]consumer
-	exitFlag   int32
+	name     string
+	topic    *topic
+	readSeg  *segment
+	readID   uint64
+	readPos  int64
+	exitFlag int32
 }
 
-func newChannel(name string, topic *topic) *channel {
-	return &channel{
-		name:      name,
-		topic:     topic,
-		consumers: make(map[string]consumer),
+func newChannel(name string, t *topic, readID uint64, readPos int64) *channel {
+	c := &channel{
+		name:    name,
+		topic:   t,
+		readID:  readID,
+		readPos: readPos,
 	}
+	c.readSeg = c.seek(c.readID)
+	return c
 }
 
-func (c *channel) addConsumer(co consumer) error {
-	c.Lock()
-	defer c.Unlock()
-
-	if _, ok := c.consumers[co.ID()]; ok {
-		return fmt.Errorf("consumer(%s) already exist", co.ID())
-	}
-	c.consumers[co.ID()] = co
-	return nil
-}
-
-func (c *channel) removeConsumer(id string) {
-	c.Lock()
-	defer c.Unlock()
-
-	delete(c.consumers, id)
-}
-
-func (c *channel) get() (*pb.Message, error) {
+func (c *channel) get() (*diskqueuepb.Message, int64, error) {
 	for {
 		if atomic.LoadInt32(&c.exitFlag) == 1 {
-			return nil, fmt.Errorf("channel(%s) already close", c.name)
+			return nil, 0, fmt.Errorf("channel(%s.%s) already close",
+				c.topic.name, c.name)
 		}
 		if c.readSeg == nil {
-			c.readSeg = c.topic.seek(c.readID)
+			c.readSeg = c.seek(c.readID)
 			c.readPos = 0
 		}
 		if c.readID < atomic.LoadUint64(&c.topic.writeID) {
 			if c.readID < atomic.LoadUint64(&c.readSeg.writeID) {
-				msg, size := c.readSeg.readOne(c.readID, c.readPos)
-				c.readPos += size
-				return msg, nil
+				msg, nextPos := c.readSeg.readOne(c.readID, c.readPos)
+				return msg, nextPos, nil
 			} else {
 				c.readSeg = nil
 				continue
@@ -77,18 +55,29 @@ func (c *channel) get() (*pb.Message, error) {
 	}
 }
 
-func (c *channel) advance() {
-	c.RLock()
-	defer c.RUnlock()
-
+func (c *channel) advance(nextPos int64) {
 	c.readID++
+	c.readPos = nextPos
+}
+
+func (c *channel) seek(msgID uint64) *segment {
+	c.topic.seglock.RLock()
+	defer c.topic.seglock.RUnlock()
+
+	if len(c.topic.segs) == 0 {
+		log.Fatal("empty segments")
+	}
+	index := sort.Search(len(c.topic.segs), func(i int) bool {
+		return c.topic.segs[i].minID > msgID
+	})
+	if index == 0 {
+		log.Fatal("not found segment")
+	}
+	return c.topic.segs[index-1]
 }
 
 func (c *channel) close() {
 	if !atomic.CompareAndSwapInt32(&c.exitFlag, 0, 1) {
 		return
-	}
-	for _, co := range c.consumers {
-		co.Close()
 	}
 }

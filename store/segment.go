@@ -9,7 +9,7 @@ import (
 	"github.com/tddhit/tools/log"
 	"github.com/tddhit/tools/mmap"
 
-	pb "github.com/tddhit/diskqueue/pb"
+	"github.com/tddhit/diskqueue/pb"
 )
 
 const (
@@ -21,15 +21,26 @@ type segment struct {
 	minID    uint64
 	writeID  uint64
 	writePos int64
+	ctime    int64
 	path     string
 	file     *mmap.MmapFile
 }
 
-func newSegment(path string, mode, advise int, minID uint64) (*segment, error) {
+func newSegment(
+	path string,
+	mode int,
+	advise int,
+	minID uint64,
+	writeID uint64,
+	writePos int64,
+	ctime int64) (*segment, error) {
+
 	s := &segment{
-		minID:   minID,
-		writeID: minID,
-		path:    path,
+		minID:    minID,
+		writeID:  writeID,
+		writePos: writePos,
+		ctime:    ctime,
+		path:     path,
 	}
 	file, err := mmap.New(path, maxSegmentSize+2*maxMsgSize, mode, advise)
 	if err != nil {
@@ -47,7 +58,7 @@ func (s *segment) full() bool {
 	return true
 }
 
-func (s *segment) writeOne(msg *pb.Message) error {
+func (s *segment) writeOne(msg *diskqueuepb.Message) error {
 	buf, err := proto.Marshal(msg)
 	if err != nil {
 		log.Error(err)
@@ -71,27 +82,25 @@ func (s *segment) writeOne(msg *pb.Message) error {
 	return nil
 }
 
-func (s *segment) readOne(msgID uint64, pos int64) (*pb.Message, int64) {
-	msg := &pb.Message{}
-	offset := pos
-	len, err := s.file.Uint32At(offset)
+func (s *segment) readOne(msgID uint64, pos int64) (*diskqueuepb.Message, int64) {
+	msg := &diskqueuepb.Message{}
+	len, err := s.file.Uint32At(pos)
 	if err != nil {
 		log.Fatal(err)
 	}
-	offset += 4
-	buf, err := s.file.ReadAt(offset, int64(len))
+	pos += 4
+	buf, err := s.file.ReadAt(pos, int64(len))
 	if err != nil {
 		log.Fatal(err)
 	}
-	offset += int64(len)
+	pos += int64(len)
 	if err := proto.Unmarshal(buf, msg); err != nil {
 		log.Fatal(err)
 	}
-	if msg.GetID() != msgID {
-		log.Fatalf("msg.GetID(%d) != msgID(%d)", msg.GetID(), msgID)
+	if msg.ID != msgID {
+		log.Fatalf("msg.ID(%d) != msgID(%d)", msg.ID, msgID)
 	}
-	log.Debugf("seg readOne\tid=%d", msg.GetID())
-	return msg, offset - pos
+	return msg, pos
 }
 
 func (s *segment) sync() error {

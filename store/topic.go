@@ -7,28 +7,29 @@ import (
 	"math/rand"
 	"os"
 	"path"
-	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/gogo/protobuf/proto"
+
+	"github.com/tddhit/diskqueue/pb"
 	"github.com/tddhit/tools/log"
 	"github.com/tddhit/tools/mmap"
-
-	pb "github.com/tddhit/diskqueue/pb"
 )
 
 type topic struct {
 	sync.RWMutex
-	name         string
-	dataDir      string
-	writeID      uint64
-	segs         segments
-	channels     map[string]*channel
-	filter       *filter
-	writeSeg     *segment
-	writeC       chan *pb.Message
+	name    string
+	dataDir string
+
+	channels map[string]*channel
+	segs     segments
+	seglock  sync.RWMutex
+	writeSeg *segment
+	writeID  uint64
+
+	writeC       chan *diskqueuepb.Message
 	writeRspC    chan error
 	syncInterval time.Duration
 	exitFlag     int32
@@ -38,9 +39,12 @@ type topic struct {
 
 func newTopic(dataDir, name string) (*topic, error) {
 	t := &topic{
-		name:         name,
-		dataDir:      path.Join(dataDir, name, "data"),
-		writeC:       make(chan *pb.Message),
+		name:    name,
+		dataDir: path.Join(dataDir, name, "data"),
+
+		channels: make(map[string]*channel),
+
+		writeC:       make(chan *diskqueuepb.Message),
 		writeRspC:    make(chan error),
 		syncInterval: 10 * time.Second,
 		exitC:        make(chan struct{}),
@@ -49,18 +53,14 @@ func newTopic(dataDir, name string) (*topic, error) {
 		log.Error(err)
 		return nil, err
 	}
-	filter, err := newFilter(dataDir, name)
-	if err != nil {
-		return nil, err
-	}
-	t.filter = filter
 	if err := t.loadMetadata(); err != nil {
 		if !os.IsNotExist(err) {
 			return nil, err
 		}
 	}
 	if len(t.segs) == 0 {
-		if err := t.createSegment(mmap.APPEND, 0); err != nil {
+		err := t.createSegment(mmap.APPEND, 0, 0, 0, time.Now().Unix())
+		if err != nil {
 			return nil, err
 		}
 		t.sync()
@@ -83,45 +83,48 @@ func newTopic(dataDir, name string) (*topic, error) {
 	return t, nil
 }
 
-func (t *topic) push(data []byte) error {
+func (t *topic) push(data []byte) (uint64, error) {
 	t.RLock()
 	defer t.RUnlock()
 
 	if atomic.LoadInt32(&t.exitFlag) == 1 {
-		return errors.New("diskqueue already close")
+		return 0, errors.New("diskqueue already close")
 	}
-	t.writeC <- &pb.Message{Data: data}
-	return <-t.writeRspC
+	t.writeC <- &diskqueuepb.Message{Data: data}
+	err := <-t.writeRspC
+	if err == nil {
+		return t.writeID - 1, nil
+	}
+	return 0, err
 }
 
-func (t *topic) seek(msgID uint64) *segment {
-	if len(t.segs) == 0 {
-		log.Fatal("empty segments")
-	}
-	index := sort.Search(len(t.segs), func(i int) bool {
-		return t.segs[i].minID > msgID
-	})
-	if index == 0 {
-		log.Fatal("not found segment")
-	}
-	return t.segs[index-1]
-}
+func (t *topic) createSegment(
+	mode int,
+	minID uint64,
+	writeID uint64,
+	writePos int64,
+	ctime int64) error {
 
-func (t *topic) createSegment(mode int, minID uint64) error {
 	file := fmt.Sprintf(path.Join(t.dataDir, "%s.diskqueue.%d.dat"),
 		t.name, minID)
-	seg, err := newSegment(file, mode, mmap.SEQUENTIAL, minID)
+	seg, err := newSegment(file, mode, mmap.SEQUENTIAL,
+		minID, writeID, writePos, ctime)
 	if err != nil {
 		return err
 	}
+
+	t.seglock.Lock()
 	t.segs = append(t.segs, seg)
+	t.seglock.Unlock()
+
 	t.writeSeg = seg
 	return nil
 }
 
-func (t *topic) writeOne(msg *pb.Message) error {
+func (t *topic) writeOne(msg *diskqueuepb.Message) error {
 	if t.writeSeg.full() {
-		if err := t.createSegment(mmap.APPEND, msg.ID); err != nil {
+		err := t.createSegment(mmap.APPEND, msg.ID, msg.ID, 0, time.Now().Unix())
+		if err != nil {
 			return err
 		}
 		t.sync()
@@ -130,7 +133,6 @@ func (t *topic) writeOne(msg *pb.Message) error {
 		return err
 	}
 	atomic.AddUint64(&t.writeID, 1)
-	log.Debugf("writeOne\tid=%d\tdata=%s", msg.ID, string(msg.GetData()))
 	return nil
 }
 
@@ -155,8 +157,10 @@ func (t *topic) recycleLoop() {
 		case <-ticker.C:
 			t.Lock()
 			if len(t.segs) > 1 {
-				t.segs[0].delete()
-				t.segs = t.segs[1:]
+				if time.Since(time.Unix(t.segs[0].ctime, 0)) >= 7*24*time.Hour {
+					t.segs[0].delete()
+					t.segs = t.segs[1:]
+				}
 			}
 			t.Unlock()
 		case <-t.exitC:
@@ -192,22 +196,23 @@ func (t *topic) persistMetadata() error {
 	if err != nil {
 		return err
 	}
-	meta := &pb.Metadata{
+	meta := &diskqueuepb.Metadata{
 		Topic:   t.name,
 		WriteID: t.writeID,
 	}
 	for _, c := range t.channels {
-		meta.Channels = append(meta.Channels, &pb.Metadata_Channel{
+		meta.Channels = append(meta.Channels, &diskqueuepb.Metadata_Channel{
 			Name:    c.name,
 			ReadID:  c.readID,
 			ReadPos: c.readPos,
 		})
 	}
 	for _, s := range t.segs {
-		meta.Segments = append(meta.Segments, &pb.Metadata_Segment{
-			MinID:    s.minID,
-			WriteID:  s.writeID,
-			WritePos: s.writePos,
+		meta.Segments = append(meta.Segments, &diskqueuepb.Metadata_Segment{
+			MinID:      s.minID,
+			WriteID:    s.writeID,
+			WritePos:   s.writePos,
+			CreateTime: s.ctime,
 		})
 	}
 	data, err := proto.Marshal(meta)
@@ -235,11 +240,12 @@ func (t *topic) loadMetadata() error {
 		log.Error(err)
 		return err
 	}
-	meta := &pb.Metadata{}
+	meta := &diskqueuepb.Metadata{}
 	if err := proto.Unmarshal(data, meta); err != nil {
 		log.Error(err)
 		return err
 	}
+	t.writeID = meta.WriteID
 	var mode int
 	for i, s := range meta.Segments {
 		if i != len(meta.Segments)-1 {
@@ -247,9 +253,13 @@ func (t *topic) loadMetadata() error {
 		} else {
 			mode = mmap.APPEND
 		}
-		if err := t.createSegment(mode, s.MinID); err != nil {
+		err := t.createSegment(mode, s.MinID, s.WriteID, s.WritePos, s.CreateTime)
+		if err != nil {
 			return err
 		}
+	}
+	for _, c := range meta.Channels {
+		t.channels[c.Name] = newChannel(c.Name, t, c.ReadID, c.ReadPos)
 	}
 	return nil
 }
@@ -267,14 +277,16 @@ func (t *topic) getOrCreateChannel(name string) (_ *channel, created bool) {
 		t.Unlock()
 		return c, false
 	}
-	c := newChannel(name, t)
+	c := &channel{
+		name:  name,
+		topic: t,
+	}
 	t.channels[name] = c
 	t.Unlock()
 	return c, true
 }
 
 func (t *topic) close() error {
-	log.Debug("Close")
 	t.Lock()
 	defer t.Unlock()
 
