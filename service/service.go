@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/tddhit/box/mw"
@@ -33,6 +34,7 @@ type Service struct {
 	dataDir       string
 	dl            *dirlock.DirLock
 	filterCounter *prometheus.CounterVec
+	exitC         chan struct{}
 }
 
 func NewService(ctx *cli.Context) *Service {
@@ -74,6 +76,7 @@ func NewService(ctx *cli.Context) *Service {
 			},
 			[]string{},
 		),
+		exitC: make(chan struct{}),
 	}
 	prometheus.MustRegister(s.filterCounter)
 	if err := s.dl.Lock(); err != nil {
@@ -89,7 +92,7 @@ func (s *Service) Push(ctx context.Context,
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	log.Debugf("push\t%s\t%d\t%s", in.Topic, id, string(in.Data))
+	log.Debugf("push\t%s\t%d\t%d\t%s", in.Topic, id, len(in.Data), string(in.Data))
 	return &pb.PushRsp{ID: id}, nil
 }
 
@@ -120,7 +123,7 @@ func (s *Service) Pop(ctx context.Context,
 			return nil, err
 		}
 	}
-	log.Debugf("pop\t%s\t%s\t%d\ts", in.Topic, in.Channel, msg.ID, string(msg.Data))
+	log.Debugf("pop\t%s\t%s\t%d\t%s", in.Topic, in.Channel, msg.ID, string(msg.Data))
 	return &pb.PopRsp{Message: msg}, nil
 }
 
@@ -176,12 +179,19 @@ func (s *Service) GetState(ctx context.Context,
 func (s *Service) WatchState(in *pb.WatchStateReq,
 	stream pb.Diskqueue_WatchStateServer) error {
 
+	ticker := time.NewTicker(time.Second)
 	for {
-		err := stream.Send(&pb.WatchStateRsp{State: s.queue.GetState()})
-		if err != nil {
-			return err
+		select {
+		case <-ticker.C:
+			err := stream.Send(&pb.WatchStateRsp{State: s.queue.GetState()})
+			if err != nil {
+				return err
+			}
+		case <-s.exitC:
+			goto exit
 		}
 	}
+exit:
 	return nil
 }
 
@@ -216,9 +226,9 @@ func (s *Service) getOrCreateClient(addr string) *client {
 }
 
 func (s *Service) Close() {
-	log.Debug("Close")
 	s.Lock()
 	defer s.Unlock()
 
+	close(s.exitC)
 	s.queue.Close()
 }

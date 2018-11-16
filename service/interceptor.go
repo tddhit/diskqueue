@@ -20,11 +20,11 @@ func CheckPeerWithUnary(s *Service) interceptor.UnaryServerMiddleware {
 			if ok && p != nil && p.Addr != nil && p.Addr.String() != "" {
 				addr := p.Addr.String()
 				switch info.FullMethod {
-				case "/diskqueue.Diskqueue/Pop":
+				case "/diskqueuepb.Diskqueue/Pop":
 					log.Info(addr, "pull")
 					c := s.getOrCreateClient(addr)
 					ctx = context.WithValue(ctx, "client", c)
-				case "/diskqueue.Diskqueue/Ack":
+				case "/diskqueuepb.Diskqueue/Ack":
 					c, ok := s.getClient(addr)
 					if ok {
 						ctx = context.WithValue(ctx, "client", c)

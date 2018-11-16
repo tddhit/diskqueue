@@ -59,7 +59,7 @@ func newTopic(dataDir, name string) (*topic, error) {
 		}
 	}
 	if len(t.segs) == 0 {
-		err := t.createSegment(mmap.APPEND, 0, 0, 0, time.Now().Unix())
+		err := t.createSegment(mmap.MODE_APPEND, 0, 0, 0, time.Now().Unix())
 		if err != nil {
 			return nil, err
 		}
@@ -107,7 +107,7 @@ func (t *topic) createSegment(
 
 	file := fmt.Sprintf(path.Join(t.dataDir, "%s.diskqueue.%d.dat"),
 		t.name, minID)
-	seg, err := newSegment(file, mode, mmap.SEQUENTIAL,
+	seg, err := newSegment(file, mode, mmap.ADVISE_SEQUENTIAL,
 		minID, writeID, writePos, ctime)
 	if err != nil {
 		return err
@@ -123,7 +123,7 @@ func (t *topic) createSegment(
 
 func (t *topic) writeOne(msg *diskqueuepb.Message) error {
 	if t.writeSeg.full() {
-		err := t.createSegment(mmap.APPEND, msg.ID, msg.ID, 0, time.Now().Unix())
+		err := t.createSegment(mmap.MODE_APPEND, msg.ID, msg.ID, 0, time.Now().Unix())
 		if err != nil {
 			return err
 		}
@@ -249,9 +249,9 @@ func (t *topic) loadMetadata() error {
 	var mode int
 	for i, s := range meta.Segments {
 		if i != len(meta.Segments)-1 {
-			mode = mmap.RDONLY
+			mode = mmap.MODE_RDONLY
 		} else {
-			mode = mmap.APPEND
+			mode = mmap.MODE_APPEND
 		}
 		err := t.createSegment(mode, s.MinID, s.WriteID, s.WritePos, s.CreateTime)
 		if err != nil {

@@ -1,6 +1,7 @@
 package resolver
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"sync"
@@ -8,12 +9,11 @@ import (
 	"time"
 
 	"github.com/hashicorp/raft"
-	"github.com/tddhit/box/transport"
-	"github.com/tddhit/tools/log"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc/resolver"
 
-	pb "github.com/tddhit/diskqueue/pb"
+	"github.com/tddhit/box/transport"
+	"github.com/tddhit/diskqueue/pb"
+	"github.com/tddhit/tools/log"
 )
 
 func init() {
@@ -71,7 +71,7 @@ func (r *dqResolver) getLeader() (string, error) {
 	log.Info("Try to get the leader of diskqueue.")
 	var (
 		wg             sync.WaitGroup
-		replies        = make(map[string]*pb.GetStateReply)
+		replies        = make(map[string]*diskqueuepb.GetStateRsp)
 		leaderEndpoint string
 	)
 	for _, endpoint := range r.endpoints {
@@ -83,8 +83,8 @@ func (r *dqResolver) getLeader() (string, error) {
 				log.Error(err)
 				return
 			}
-			client := pb.NewDiskqueueGrpcClient(conn)
-			reply, err := client.GetState(r.ctx, &pb.GetStateRequest{})
+			client := diskqueuepb.NewDiskqueueGrpcClient(conn)
+			reply, err := client.GetState(r.ctx, &diskqueuepb.GetStateReq{})
 			if err != nil {
 				log.Error(err)
 				return
@@ -126,8 +126,8 @@ func (r *dqResolver) watchLeader() {
 			time.Sleep(time.Second)
 			continue
 		}
-		client := pb.NewDiskqueueGrpcClient(conn)
-		streamClient, err := client.WatchState(r.ctx, &pb.WatchStateRequest{})
+		client := diskqueuepb.NewDiskqueueGrpcClient(conn)
+		streamClient, err := client.WatchState(r.ctx, &diskqueuepb.WatchStateReq{})
 		if err != nil {
 			log.Error(err)
 			time.Sleep(time.Second)

@@ -103,6 +103,7 @@ func startProduce(params *cli.Context) {
 					case <-ctx.Done():
 						return
 					case data := <-dataC:
+						count++
 						rsp, err := c.Push(ctx, &diskqueuepb.PushReq{
 							Topic: topic,
 							Data:  data,
@@ -179,6 +180,7 @@ func startConsume(params *cli.Context) {
 					case <-ctx.Done():
 						return
 					default:
+						count++
 						rsp, err := c.Pop(ctx, &diskqueuepb.PopReq{
 							Topic:   topic,
 							Channel: channel,
