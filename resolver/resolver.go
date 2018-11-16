@@ -3,6 +3,7 @@ package resolver
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -70,9 +71,9 @@ func (r *dqResolver) ResolveNow(opt resolver.ResolveNowOption) {
 func (r *dqResolver) getLeader() (string, error) {
 	log.Info("Try to get the leader of diskqueue.")
 	var (
-		wg             sync.WaitGroup
-		replies        = make(map[string]*diskqueuepb.GetStateRsp)
-		leaderEndpoint string
+		wg              sync.WaitGroup
+		replies         sync.Map
+		leaderEndpoints []string
 	)
 	for _, endpoint := range r.endpoints {
 		wg.Add(1)
@@ -89,23 +90,26 @@ func (r *dqResolver) getLeader() (string, error) {
 				log.Error(err)
 				return
 			}
-			replies[endpoint] = reply
+			replies.Store(endpoint, reply)
 		}(endpoint)
 	}
 	wg.Wait()
-	for endpoint, reply := range replies {
-		if reply.GetState() == uint32(raft.Leader) {
-			if leaderEndpoint == "" {
-				leaderEndpoint = endpoint
-			} else {
-				return "", errors.New("more than one leader")
-			}
+	replies.Range(func(key, value interface{}) bool {
+		endpoint := key.(string)
+		reply, ok := value.(*diskqueuepb.GetStateRsp)
+		if !ok {
+			log.Errorf("Invalid GetStateRsp (%s)", endpoint)
+			return true
 		}
+		if reply.GetState() == uint32(raft.Leader) {
+			leaderEndpoints = append(leaderEndpoints, endpoint)
+		}
+		return true
+	})
+	if len(leaderEndpoints) != 1 {
+		return "", fmt.Errorf("Abnormal Leader: %v", leaderEndpoints)
 	}
-	if leaderEndpoint == "" {
-		return "", errors.New("no leader")
-	}
-	return leaderEndpoint, nil
+	return leaderEndpoints[0], nil
 }
 
 func (r *dqResolver) watchLeader() {

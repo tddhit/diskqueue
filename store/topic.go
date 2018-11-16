@@ -20,15 +20,14 @@ import (
 
 type topic struct {
 	sync.RWMutex
-	name    string
-	dataDir string
-
-	channels map[string]*channel
-	segs     segments
-	seglock  sync.RWMutex
-	writeSeg *segment
-	writeID  uint64
-
+	name         string
+	dataDir      string
+	channels     map[string]*channel
+	segs         segments
+	seglock      sync.RWMutex
+	writeSeg     *segment
+	writeID      uint64
+	cond         *sync.Cond
 	writeC       chan *diskqueuepb.Message
 	writeRspC    chan error
 	syncInterval time.Duration
@@ -39,11 +38,10 @@ type topic struct {
 
 func newTopic(dataDir, name string) (*topic, error) {
 	t := &topic{
-		name:    name,
-		dataDir: path.Join(dataDir, name, "data"),
-
-		channels: make(map[string]*channel),
-
+		name:         name,
+		dataDir:      path.Join(dataDir, name, "data"),
+		channels:     make(map[string]*channel),
+		cond:         sync.NewCond(&sync.Mutex{}),
 		writeC:       make(chan *diskqueuepb.Message),
 		writeRspC:    make(chan error),
 		syncInterval: 10 * time.Second,
@@ -133,6 +131,7 @@ func (t *topic) writeOne(msg *diskqueuepb.Message) error {
 		return err
 	}
 	atomic.AddUint64(&t.writeID, 1)
+	t.cond.Broadcast()
 	return nil
 }
 
@@ -259,7 +258,7 @@ func (t *topic) loadMetadata() error {
 		}
 	}
 	for _, c := range meta.Channels {
-		t.channels[c.Name] = newChannel(c.Name, t, c.ReadID, c.ReadPos)
+		t.channels[c.Name] = newChannel(c.Name, t, c.ReadID, c.ReadPos, t.cond)
 	}
 	return nil
 }
@@ -277,10 +276,7 @@ func (t *topic) getOrCreateChannel(name string) (_ *channel, created bool) {
 		t.Unlock()
 		return c, false
 	}
-	c := &channel{
-		name:  name,
-		topic: t,
-	}
+	c := newChannel(name, t, 0, 0, t.cond)
 	t.channels[name] = c
 	t.Unlock()
 	return c, true

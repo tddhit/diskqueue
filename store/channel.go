@@ -2,8 +2,8 @@ package store
 
 import (
 	"fmt"
-	"runtime"
 	"sort"
+	"sync"
 	"sync/atomic"
 
 	"github.com/tddhit/diskqueue/pb"
@@ -16,15 +16,23 @@ type channel struct {
 	readSeg  *segment
 	readID   uint64
 	readPos  int64
+	cond     *sync.Cond
 	exitFlag int32
 }
 
-func newChannel(name string, t *topic, readID uint64, readPos int64) *channel {
+func newChannel(
+	name string,
+	t *topic,
+	readID uint64,
+	readPos int64,
+	cond *sync.Cond) *channel {
+
 	c := &channel{
 		name:    name,
 		topic:   t,
 		readID:  readID,
 		readPos: readPos,
+		cond:    cond,
 	}
 	c.readSeg = c.seek(c.readID)
 	return c
@@ -49,8 +57,9 @@ func (c *channel) get() (*diskqueuepb.Message, int64, error) {
 				continue
 			}
 		} else {
-			runtime.Gosched()
-			continue
+			c.cond.L.Lock()
+			c.cond.Wait()
+			c.cond.L.Unlock()
 		}
 	}
 }
