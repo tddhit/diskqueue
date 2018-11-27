@@ -14,7 +14,7 @@ import (
 
 const (
 	maxSegmentSize = 1 << 27 // 128M
-	maxMsgSize     = 1 << 10 // 1k
+	maxMsgSize     = 1 << 20 // 1M
 )
 
 type segment struct {
