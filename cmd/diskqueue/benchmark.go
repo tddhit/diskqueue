@@ -14,6 +14,7 @@ import (
 
 	"github.com/tddhit/box/transport"
 	"github.com/tddhit/diskqueue/pb"
+	_ "github.com/tddhit/diskqueue/resolver"
 	"github.com/tddhit/tools/log"
 )
 

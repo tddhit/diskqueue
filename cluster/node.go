@@ -9,10 +9,10 @@ import (
 
 	"github.com/hashicorp/raft"
 	raftboltdb "github.com/hashicorp/raft-boltdb"
-	box "github.com/tddhit/box/transport"
-	"github.com/tddhit/tools/log"
 
-	pb "github.com/tddhit/diskqueue/pb"
+	box "github.com/tddhit/box/transport"
+	"github.com/tddhit/diskqueue/pb"
+	"github.com/tddhit/tools/log"
 )
 
 type RaftNode struct {
@@ -67,8 +67,8 @@ func NewRaftNode(dir, addr, id, leaderAddr string, q queue) (*RaftNode, error) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		client := pb.NewDiskqueueGrpcClient(conn)
-		_, err = client.Join(context.Background(), &pb.JoinReq{
+		client := diskqueuepb.NewDiskqueueGrpcClient(conn)
+		_, err = client.Join(context.Background(), &diskqueuepb.JoinReq{
 			RaftAddr: addr,
 			NodeID:   id,
 		})

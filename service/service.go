@@ -6,30 +6,19 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/tddhit/box/mw"
-	"github.com/tddhit/tools/dirlock"
-	"github.com/tddhit/tools/log"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	pb "github.com/tddhit/diskqueue/pb"
+	"github.com/tddhit/box/mw"
+	"github.com/tddhit/diskqueue/pb"
+	"github.com/tddhit/tools/dirlock"
+	"github.com/tddhit/tools/log"
 )
-
-type queue interface {
-	Push(topic string, data, hashKey []byte) (uint64, error)
-	Pop(topic, channel string) (*pb.Message, error)
-	HasTopic(topic string) bool
-	Join(raftAddr, nodeID string) error
-	Leave(nodeID string) error
-	Snapshot() error
-	GetState() uint32
-	Close() error
-}
 
 type Service struct {
 	sync.RWMutex
-	queue         queue
+	queue         *clusterStore
 	clients       map[string]*client
 	dataDir       string
 	dl            *dirlock.DirLock
@@ -39,33 +28,21 @@ type Service struct {
 
 func NewService(ctx *cli.Context) *Service {
 	dataDir := ctx.String("datadir")
-	mode := ctx.String("mode")
 	raftAddr := ctx.String("cluster-addr")
 	nodeID := ctx.String("id")
 	leaderAddr := ctx.String("leader")
-	if mode == "cluster" {
-		if raftAddr == "" || nodeID == "" {
-			log.Fatal("invalid params")
-		}
+	if raftAddr == "" || nodeID == "" {
+		log.Fatal("invalid params")
 	}
 	if !mw.IsWorker() {
 		return nil
 	}
-	var q queue
-	switch mode {
-	case "cluster":
-		cs, err := newClusterStore(dataDir, raftAddr, nodeID, leaderAddr)
-		if err != nil {
-			log.Fatal(err)
-		}
-		q = cs
-	case "standalone":
-		fallthrough
-	default:
-		//q = newStandaloneStore(dataDir)
+	cs, err := newClusterStore(dataDir, raftAddr, nodeID, leaderAddr)
+	if err != nil {
+		log.Fatal(err)
 	}
 	s := &Service{
-		queue:   q,
+		queue:   cs,
 		clients: make(map[string]*client),
 		dataDir: dataDir,
 		dl:      dirlock.New(dataDir),
@@ -86,21 +63,21 @@ func NewService(ctx *cli.Context) *Service {
 }
 
 func (s *Service) Push(ctx context.Context,
-	in *pb.PushReq) (*pb.PushRsp, error) {
+	in *diskqueuepb.PushReq) (*diskqueuepb.PushRsp, error) {
 
 	id, err := s.queue.Push(in.GetTopic(), in.GetData(), in.GetHashKey())
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	log.Debugf("push\t%s\t%d\t%d\t%s", in.Topic, id, len(in.Data), string(in.Data))
-	return &pb.PushRsp{ID: id}, nil
+	return &diskqueuepb.PushRsp{ID: id}, nil
 }
 
 func (s *Service) Pop(ctx context.Context,
-	in *pb.PopReq) (*pb.PopRsp, error) {
+	in *diskqueuepb.PopReq) (*diskqueuepb.PopRsp, error) {
 
 	var (
-		msg *pb.Message
+		msg *diskqueuepb.Message
 		err error
 	)
 	if in.GetNeedAck() {
@@ -124,11 +101,11 @@ func (s *Service) Pop(ctx context.Context,
 		}
 	}
 	log.Debugf("pop\t%s\t%s\t%d\t%s", in.Topic, in.Channel, msg.ID, string(msg.Data))
-	return &pb.PopRsp{Message: msg}, nil
+	return &diskqueuepb.PopRsp{Message: msg}, nil
 }
 
 func (s *Service) Ack(ctx context.Context,
-	in *pb.AckReq) (*pb.AckRsp, error) {
+	in *diskqueuepb.AckReq) (*diskqueuepb.AckRsp, error) {
 
 	client := ctx.Value("client").(*client)
 	if !s.queue.HasTopic(in.GetTopic()) {
@@ -143,47 +120,47 @@ func (s *Service) Ack(ctx context.Context,
 	if err := inflight.remove(in.GetMsgID()); err != nil {
 		return nil, status.Error(codes.NotFound, err.Error())
 	}
-	return &pb.AckRsp{}, nil
+	return &diskqueuepb.AckRsp{}, nil
 }
 
 func (s *Service) Join(ctx context.Context,
-	in *pb.JoinReq) (*pb.JoinRsp, error) {
+	in *diskqueuepb.JoinReq) (*diskqueuepb.JoinRsp, error) {
 
 	if err := s.queue.Join(in.GetRaftAddr(), in.GetNodeID()); err != nil {
 		return nil, err
 	}
-	return &pb.JoinRsp{}, nil
+	return &diskqueuepb.JoinRsp{}, nil
 }
 
 func (s *Service) Leave(ctx context.Context,
-	in *pb.LeaveReq) (*pb.LeaveRsp, error) {
+	in *diskqueuepb.LeaveReq) (*diskqueuepb.LeaveRsp, error) {
 
 	if err := s.queue.Leave(in.GetNodeID()); err != nil {
 		return nil, err
 	}
-	return &pb.LeaveRsp{}, nil
+	return &diskqueuepb.LeaveRsp{}, nil
 }
 
 func (s *Service) Snapshot(ctx context.Context,
-	in *pb.SnapshotReq) (*pb.SnapshotRsp, error) {
+	in *diskqueuepb.SnapshotReq) (*diskqueuepb.SnapshotRsp, error) {
 
 	return nil, nil
 }
 
 func (s *Service) GetState(ctx context.Context,
-	in *pb.GetStateReq) (*pb.GetStateRsp, error) {
+	in *diskqueuepb.GetStateReq) (*diskqueuepb.GetStateRsp, error) {
 
-	return &pb.GetStateRsp{State: s.queue.GetState()}, nil
+	return &diskqueuepb.GetStateRsp{State: s.queue.GetState()}, nil
 }
 
-func (s *Service) WatchState(in *pb.WatchStateReq,
-	stream pb.Diskqueue_WatchStateServer) error {
+func (s *Service) WatchState(in *diskqueuepb.WatchStateReq,
+	stream diskqueuepb.Diskqueue_WatchStateServer) error {
 
 	ticker := time.NewTicker(time.Second)
 	for {
 		select {
 		case <-ticker.C:
-			err := stream.Send(&pb.WatchStateRsp{State: s.queue.GetState()})
+			err := stream.Send(&diskqueuepb.WatchStateRsp{State: s.queue.GetState()})
 			if err != nil {
 				return err
 			}

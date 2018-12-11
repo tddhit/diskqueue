@@ -297,6 +297,9 @@ func (t *topic) close() error {
 	for _, seg := range t.segs {
 		seg.close()
 	}
+	for _, c := range t.channels {
+		c.close()
+	}
 	return nil
 }
 

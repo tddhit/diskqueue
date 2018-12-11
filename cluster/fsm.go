@@ -5,9 +5,9 @@ import (
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/hashicorp/raft"
-	"github.com/tddhit/tools/log"
 
-	pb "github.com/tddhit/diskqueue/pb"
+	"github.com/tddhit/diskqueue/pb"
+	"github.com/tddhit/tools/log"
 )
 
 type queue interface {
@@ -26,19 +26,19 @@ func newFSM(q queue) *fsm {
 }
 
 func (f *fsm) Apply(l *raft.Log) interface{} {
-	var cmd pb.Command
+	var cmd diskqueuepb.Command
 	if err := proto.Unmarshal(l.Data, &cmd); err != nil {
 		log.Panic(err)
 	}
 	switch cmd.Op {
-	case pb.Command_PUSH:
+	case diskqueuepb.Command_PUSH:
 		var rsp struct {
 			ID  uint64
 			Err error
 		}
 		rsp.ID, rsp.Err = f.queue.Push(cmd.Topic, cmd.Data, cmd.HashKey)
 		return rsp
-	case pb.Command_ADVANCE:
+	case diskqueuepb.Command_ADVANCE:
 		f.queue.Advance(cmd.Topic, cmd.Channel, cmd.NextPos)
 	default:
 		log.Panic("Invalid Op")

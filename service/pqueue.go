@@ -1,8 +1,8 @@
 package service
 
-import pb "github.com/tddhit/diskqueue/pb"
+import "github.com/tddhit/diskqueue/pb"
 
-type pqueue []*pb.Message
+type pqueue []*diskqueuepb.Message
 
 func (q pqueue) Len() int { return len(q) }
 func (q pqueue) Less(i, j int) bool {
@@ -11,7 +11,7 @@ func (q pqueue) Less(i, j int) bool {
 func (q pqueue) Swap(i, j int) { q[i], q[j] = q[j], q[i] }
 
 func (q *pqueue) Push(x interface{}) {
-	*q = append(*q, x.(*pb.Message))
+	*q = append(*q, x.(*diskqueuepb.Message))
 }
 
 func (q *pqueue) Pop() interface{} {

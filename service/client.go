@@ -22,7 +22,7 @@ func (c *client) getInflight(topic string) (*inflight, bool) {
 	return f, ok
 }
 
-func (c *client) getOrCreateInflight(topic string, q queue) *inflight {
+func (c *client) getOrCreateInflight(topic string, q *clusterStore) *inflight {
 	c.RLock()
 	f, ok := c.inflights[topic]
 	if ok {

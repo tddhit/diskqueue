@@ -3,12 +3,13 @@ package service
 import (
 	"context"
 
-	"github.com/tddhit/box/interceptor"
-	"github.com/tddhit/box/transport/common"
-	"github.com/tddhit/tools/log"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
+
+	"github.com/tddhit/box/interceptor"
+	"github.com/tddhit/box/transport/common"
+	"github.com/tddhit/tools/log"
 )
 
 func CheckPeerWithUnary(s *Service) interceptor.UnaryServerMiddleware {

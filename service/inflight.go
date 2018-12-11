@@ -7,9 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/tddhit/diskqueue/pb"
 	"github.com/tddhit/tools/log"
-
-	pb "github.com/tddhit/diskqueue/pb"
 )
 
 const (
@@ -19,20 +18,20 @@ const (
 type inflight struct {
 	sync.RWMutex
 	topic   string
-	queue   queue
+	queue   *clusterStore
 	pqueue  *pqueue
-	m       map[uint64]*pb.Message
+	m       map[uint64]*diskqueuepb.Message
 	cond    *sync.Cond
 	timeout int64
 	exitC   chan struct{}
 }
 
-func newInflight(topic string, q queue) *inflight {
+func newInflight(topic string, q *clusterStore) *inflight {
 	f := &inflight{
 		topic:   topic,
 		queue:   q,
 		pqueue:  &pqueue{},
-		m:       make(map[uint64]*pb.Message, maxInflight),
+		m:       make(map[uint64]*diskqueuepb.Message, maxInflight),
 		cond:    sync.NewCond(&sync.Mutex{}),
 		timeout: int64(10 * time.Second),
 		exitC:   make(chan struct{}),
@@ -70,7 +69,7 @@ func (f *inflight) process() {
 	}
 }
 
-func (f *inflight) push(msg *pb.Message) {
+func (f *inflight) push(msg *diskqueuepb.Message) {
 	if msg == nil {
 		return
 	}
@@ -83,14 +82,14 @@ func (f *inflight) push(msg *pb.Message) {
 	log.Info("push", msg.GetID())
 }
 
-func (f *inflight) pop(now int64) (*pb.Message, error) {
+func (f *inflight) pop(now int64) (*diskqueuepb.Message, error) {
 	f.Lock()
 	defer f.Unlock()
 
 	if f.pqueue.Len() == 0 {
 		return nil, errors.New("inFlightQueue is empty.")
 	}
-	msg := heap.Pop(f.pqueue).(*pb.Message)
+	msg := heap.Pop(f.pqueue).(*diskqueuepb.Message)
 	if now < msg.GetTimestamp()+f.timeout {
 		heap.Push(f.pqueue, msg)
 		return nil, errors.New("no timeout message.")

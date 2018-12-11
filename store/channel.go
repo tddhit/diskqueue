@@ -89,4 +89,5 @@ func (c *channel) close() {
 	if !atomic.CompareAndSwapInt32(&c.exitFlag, 0, 1) {
 		return
 	}
+	c.cond.Broadcast()
 }

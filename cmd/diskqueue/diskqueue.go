@@ -44,11 +44,6 @@ var serviceCommand = cli.Command{
 			Usage: "node id in raft cluster",
 		},
 		cli.StringFlag{
-			Name:  "mode",
-			Usage: "[standalone|cluster]",
-			Value: "standalone",
-		},
-		cli.StringFlag{
 			Name:  "datadir",
 			Usage: "data directory",
 			Value: "./data",
